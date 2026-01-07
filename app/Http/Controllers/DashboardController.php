@@ -24,7 +24,10 @@ class DashboardController extends Controller
             ->select('departments.name', DB::raw('SUM(total_estimated_cost) as total'))
             ->groupBy('departments.name')
             ->get();
+            
+        // Budget Summary
+        $departmentBudgets = \App\Models\Department::all();
 
-        return view('dashboard', compact('stats', 'budgetChart'));
+        return view('dashboard', compact('stats', 'budgetChart', 'departmentBudgets'));
     }
 }

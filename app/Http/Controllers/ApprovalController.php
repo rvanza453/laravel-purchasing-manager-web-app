@@ -17,13 +17,15 @@ class ApprovalController extends Controller
 
     public function index()
     {
-        // Show tasks assigned to current user
-        // Filter approvals where approver_id = auth->id AND status = Pending
-        $approvals = PrApproval::where('approver_id', auth()->id())
-            ->where('status', 'Pending')
-            ->with(['purchaseRequest.user', 'purchaseRequest.category'])
-            ->orderBy('created_at', 'asc')
-            ->get();
+        // Admin can see all pending approvals, regular users see only their assigned approvals
+        $query = PrApproval::where('status', 'Pending')
+            ->with(['purchaseRequest.user', 'purchaseRequest.department']);
+        
+        if (!auth()->user()->hasRole('admin')) {
+            $query->where('approver_id', auth()->id());
+        }
+        
+        $approvals = $query->orderBy('created_at', 'asc')->get();
 
         return view('approval.index', compact('approvals'));
     }

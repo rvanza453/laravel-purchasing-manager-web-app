@@ -66,7 +66,12 @@
                 <tbody class="bg-white divide-y divide-gray-200">
                     @foreach($pr->items as $item)
                         <tr>
-                            <td class="px-6 py-4 text-sm text-gray-900">{{ $item->item_name }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-900">
+                                <div class="font-medium">{{ $item->item_name }}</div>
+                                @if($item->specification)
+                                    <div class="text-xs text-gray-500 mt-0.5">{{ $item->specification }}</div>
+                                @endif
+                            </td>
                             <td class="px-6 py-4 text-sm text-gray-900">{{ $item->quantity }}</td>
                             <td class="px-6 py-4 text-sm text-gray-500">{{ $item->unit }}</td>
                             <td class="px-6 py-4 text-sm text-gray-900 text-right">Rp {{ number_format($item->price_estimation, 0, ',', '.') }}</td>

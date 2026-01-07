@@ -11,7 +11,7 @@ class Department extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['site_id', 'name', 'code'];
+    protected $fillable = ['site_id', 'name', 'code', 'budget'];
 
     public function site(): BelongsTo
     {

@@ -76,7 +76,7 @@
         function openRejectModal(id) {
             const modal = document.getElementById('rejectModal');
             const form = document.getElementById('rejectForm');
-            form.action = `/approvals/\${id}/reject`; // Adjust route if needed
+            form.action = `/approvals/${id}/reject`; // Adjust route if needed
             modal.classList.remove('hidden');
             modal.classList.add('flex');
         }

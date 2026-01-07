@@ -1,7 +1,7 @@
 <section>
     <header>
         <h2 class="text-lg font-medium text-gray-900">
-            {{ __('Kepegawaian') }}
+            {{ __('Kepegawaian (Edit)') }}
         </h2>
 
         <p class="mt-1 text-sm text-gray-600">
@@ -16,10 +16,10 @@
         <!-- Site -->
         <div>
             <x-input-label for="site_id" :value="__('Lokasi / Site')" />
-            <select id="site_id" name="site_id" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
+            <select id="site_id" name="site_id" class="mt-1 block w-full bg-white border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
                 <option value="">-- Pilih Site --</option>
                 @foreach($sites as $site)
-                    <option value="{{ $site->id }}" {{ object_get($user, 'site_id') == $site->id ? 'selected' : '' }}>
+                    <option value="{{ $site->id }}" {{ $user->site_id == $site->id ? 'selected' : '' }}>
                         {{ $site->name }} ({{ $site->code }})
                     </option>
                 @endforeach
@@ -30,10 +30,10 @@
         <!-- Department -->
         <div>
             <x-input-label for="department_id" :value="__('Departemen')" />
-             <select id="department_id" name="department_id" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
+             <select id="department_id" name="department_id" class="mt-1 block w-full bg-white border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
                 <option value="">-- Pilih Departemen --</option>
                 @foreach($departments as $dept)
-                    <option value="{{ $dept->id }}" {{ object_get($user, 'department_id') == $dept->id ? 'selected' : '' }}>
+                    <option value="{{ $dept->id }}" {{ $user->department_id == $dept->id ? 'selected' : '' }}>
                         {{ $dept->name }} ({{ $dept->code }})
                     </option>
                 @endforeach
@@ -44,7 +44,7 @@
         <!-- Position -->
         <div>
             <x-input-label for="position" :value="__('Jabatan / Posisi')" />
-            <x-text-input id="position" name="position" type="text" class="mt-1 block w-full" :value="old('position', $user->position)" />
+            <input id="position" name="position" type="text" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" value="{{ old('position', $user->position) }}">
             <x-input-error class="mt-2" :messages="$errors->get('position')" />
         </div>
 
@@ -59,7 +59,9 @@
         </div>
 
         <div class="flex items-center gap-4">
-            <x-primary-button>{{ __('Save') }}</x-primary-button>
+            <button type="submit" class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                {{ __('Simpan Perubahan') }}
+            </button>
 
             @if (session('status') === 'employment-updated')
                 <p
@@ -67,8 +69,8 @@
                     x-show="show"
                     x-transition
                     x-init="setTimeout(() => show = false, 2000)"
-                    class="text-sm text-gray-600"
-                >{{ __('Saved.') }}</p>
+                    class="text-sm text-green-600 font-medium"
+                >{{ __('Data berhasil disimpan.') }}</p>
             @endif
         </div>
     </form>

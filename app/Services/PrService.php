@@ -54,6 +54,7 @@ class PrService
                 $pr->items()->create([
                     'product_id' => $item['product_id'] ?? null,
                     'item_name' => $productName,
+                    'specification' => $item['specification'] ?? null,
                     'quantity' => $item['quantity'],
                     'unit' => $unit,
                     'price_estimation' => $item['price_estimation'],
@@ -66,6 +67,9 @@ class PrService
 
             // 4. Generate Initial Approvals based on Department
             $this->generateApprovals($pr);
+
+            // 5. Deduct Budget Immediately (allow negative)
+            $dept->decrement('budget', $totalCost);
 
             return $pr;
         });

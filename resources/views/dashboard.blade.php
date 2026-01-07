@@ -46,37 +46,29 @@
             </div>
         </div>
 
-        <!-- Charts Section -->
-        <div class="bg-white rounded-xl shadow-sm p-6">
-            <h3 class="text-lg font-bold text-gray-800 mb-6">Sisa Budget (Realisasi PR)</h3>
-            
-            <div class="relative h-64 w-full flex items-end justify-around gap-2 px-4 pb-8 border-b border-gray-200">
-                <!-- Graph Bars Loop -->
-                @php
-                    $max = $budgetChart->max('total') ?: 1;
-                    $colors = ['bg-primary-500', 'bg-blue-500', 'bg-purple-500', 'bg-yellow-500', 'bg-red-500'];
-                @endphp
-
-                @foreach($budgetChart as $index => $data)
-                    <div class="flex flex-col items-center group relative w-full max-w-[80px]">
-                        <!-- Tooltip -->
-                        <div class="absolute bottom-full mb-2 hidden group-hover:block bg-black text-white text-xs rounded py-1 px-2">
-                             Rp {{ number_format($data->total, 0, ',', '.') }}
+        <!-- Budget Summary Grid -->
+        <h3 class="text-lg font-bold text-gray-800">Department Budget Summary</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            @foreach($departmentBudgets as $dept)
+                <div class="bg-white rounded-xl shadow-sm p-4 border-l-4 {{ $dept->budget < 0 ? 'border-red-500' : 'border-green-500' }}">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h4 class="text-sm font-semibold text-gray-500 uppercase">{{ $dept->name }}</h4>
+                            <span class="text-xs text-gray-400">{{ $dept->site->name }}</span>
                         </div>
-                        
-                        <div class="w-full rounded-t-lg {{ $colors[$index % 5] }} transition-all duration-500 hover:opacity-90" 
-                             style="height: {{ ($data->total / $max) * 100 }}%"></div>
-                        <span class="absolute top-full mt-2 text-xs font-semibold text-gray-600 text-center w-24">{{ $data->name }}</span>
+                        <span class="text-xs font-bold px-2 py-1 rounded {{ $dept->budget < 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700' }}">
+                            {{ $dept->budget < 0 ? 'Over Budget' : 'Safe' }}
+                        </span>
                     </div>
-                @endforeach
-                
-                @if($budgetChart->isEmpty())
-                    <div class="absolute inset-0 flex items-center justify-center text-gray-400">
-                        Belum ada data PR
+                    <div class="mt-3">
+                        <span class="block text-2xl font-bold {{ $dept->budget < 0 ? 'text-red-600' : 'text-gray-800' }}">
+                            Rp {{ number_format($dept->budget, 0, ',', '.') }}
+                        </span>
+                        <span class="text-xs text-gray-500">Remaining Balance</span>
                     </div>
-                @endif
-            </div>
-             <!-- X Axis Line already in border-b above -->
+                </div>
+            @endforeach
         </div>
+
     </div>
 </x-app-layout>

@@ -33,6 +33,8 @@ Route::middleware('auth')->group(function () {
 
     // Admin Routes
     Route::resource('departments', \App\Http\Controllers\Admin\DepartmentController::class);
+    Route::get('/admin/budgets', [\App\Http\Controllers\Admin\BudgetController::class, 'index'])->name('admin.budget.index');
+    Route::patch('/admin/budgets/{department}', [\App\Http\Controllers\Admin\BudgetController::class, 'update'])->name('admin.budget.update');
 
     // PR Routes
     Route::resource('pr', PrController::class);
