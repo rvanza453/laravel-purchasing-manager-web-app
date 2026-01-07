@@ -1,0 +1,46 @@
+<?php
+
+use App\Http\Controllers\ProfileController;
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\CategoryController;
+use App\Http\Controllers\PrController;
+use App\Http\Controllers\ApprovalController;
+
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register web routes for your application. These
+| routes are loaded by the RouteServiceProvider and all of them will
+| be assigned to the "web" middleware group. Make something great!
+|
+*/
+
+Route::get('/', function () {
+    return redirect()->route('login');
+});
+
+Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
+
+Route::middleware('auth')->group(function () {
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::patch('/profile/employment', [ProfileController::class, 'updateEmployment'])->name('profile.update-employment');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // Admin Routes
+    Route::resource('departments', \App\Http\Controllers\Admin\DepartmentController::class);
+
+    // PR Routes
+    Route::resource('pr', PrController::class);
+    
+    // Approval Routes
+    Route::get('/approvals', [ApprovalController::class, 'index'])->name('approval.index');
+    Route::post('/approvals/{approval}/approve', [ApprovalController::class, 'approve'])->name('approval.approve');
+    Route::post('/approvals/{approval}/reject', [ApprovalController::class, 'reject'])->name('approval.reject');
+});
+
+require __DIR__.'/auth.php';
