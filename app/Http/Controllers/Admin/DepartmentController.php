@@ -15,56 +15,46 @@ class DepartmentController extends Controller
     public function index()
     {
         $departments = Department::with(['site', 'approverConfigs.user'])->get();
-        return view('admin.departments.index', compact('departments'));
+        $globalApprovers = \App\Models\GlobalApproverConfig::with('user')->orderBy('level')->get();
+        return view('admin.departments.index', compact('departments', 'globalApprovers'));
     }
 
     public function create()
     {
-        $sites = Site::all();
-        return view('admin.departments.create', compact('sites'));
+        return redirect()->route('master-departments.create');
     }
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'site_id' => 'required|exists:sites,id',
-            'name' => 'required|string|max:255',
-            'code' => ['required', 'string', 'max:50', Rule::unique('departments')->where(function ($query) use ($request) {
-                return $query->where('site_id', $request->site_id);
-            })],
-            'description' => 'nullable|string',
-        ]);
-
-        Department::create($validated);
-
-        return redirect()->route('departments.index')->with('success', 'Department created successfully.');
+        return redirect()->route('master-departments.index');
     }
 
     public function edit(Department $department)
     {
         $sites = Site::all();
-        $users = User::where('department_id', $department->id)->orWhere('site_id', $department->site_id)->get(); // Users in same site/dept
+        $users = User::where('department_id', $department->id)->orWhere('site_id', $department->site_id)->get(); 
         if ($users->isEmpty()) {
-             $users = User::all(); // Fallback if no users assigned yet
+             $users = User::all(); 
         }
         
+        // No need to load subDepartments here anymore
+
         return view('admin.departments.edit', compact('department', 'sites', 'users'));
     }
 
     public function update(Request $request, Department $department)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'code' => ['required', 'string', 'max:50', Rule::unique('departments')->ignore($department->id)->where(function ($query) use ($department) {
-                return $query->where('site_id', $department->site_id);
-            })],
             'approvers' => 'array',
             'approvers.*.user_id' => 'required|exists:users,id',
             'approvers.*.role_name' => 'required|string',
             'approvers.*.level' => 'required|integer',
+            'use_global_approval' => 'boolean',
         ]);
 
-        $department->update(['name' => $request->name, 'code' => $request->code]);
+        $department->update([
+            'use_global_approval' => $request->has('use_global_approval')
+        ]);
 
         // Sync Approvers
         $department->approverConfigs()->delete();
@@ -78,12 +68,11 @@ class DepartmentController extends Controller
             }
         }
 
-        return redirect()->route('departments.index')->with('success', 'Department updated successfully.');
+        return redirect()->route('departments.index')->with('success', 'Approval configuration updated successfully.');
     }
 
     public function destroy(Department $department)
     {
-        $department->delete();
-        return redirect()->route('departments.index')->with('success', 'Department deleted successfully.');
+        return redirect()->route('master-departments.index')->with('error', 'Please use Department Management to delete departments.');
     }
 }

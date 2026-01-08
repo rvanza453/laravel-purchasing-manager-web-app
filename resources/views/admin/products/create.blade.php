@@ -1,0 +1,69 @@
+<x-app-layout>
+    <x-slot name="header">
+        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+            {{ __('Add New Product') }}
+        </h2>
+    </x-slot>
+
+    <div class="py-12">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                <div class="p-6 text-gray-900">
+                    <form method="POST" action="{{ route('products.store') }}" class="space-y-6 max-w-xl">
+                        @csrf
+
+                        <div>
+                            <x-input-label for="code" :value="__('Product Code')" />
+                            <x-text-input id="code" class="block mt-1 w-full" type="text" name="code" :value="old('code')" required autofocus />
+                            <x-input-error :messages="$errors->get('code')" class="mt-2" />
+                        </div>
+
+                        <div>
+                            <x-input-label for="name" :value="__('Product Name')" />
+                            <x-text-input id="name" class="block mt-1 w-full" type="text" name="name" :value="old('name')" required />
+                            <x-input-error :messages="$errors->get('name')" class="mt-2" />
+                        </div>
+
+                        <div>
+                            <x-input-label for="category" :value="__('Category')" />
+                            <select id="category" name="category" class="mt-1 block w-full border-gray-300 focus:border-primary-500 focus:ring-primary-500 rounded-md shadow-sm">
+                                <option value="">-- Select Category --</option>
+                                @foreach ($categories as $cat)
+                                    <option value="{{ $cat }}" {{ old('category') == $cat ? 'selected' : '' }}>
+                                        {{ $cat }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <x-input-error :messages="$errors->get('category')" class="mt-2" />
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <x-input-label for="unit" :value="__('Unit (e.g. PCS, KG)')" />
+                                <x-text-input id="unit" class="block mt-1 w-full" type="text" name="unit" :value="old('unit')" required />
+                                <x-input-error :messages="$errors->get('unit')" class="mt-2" />
+                            </div>
+
+                            <div>
+                                <x-input-label for="price_estimation" :value="__('Estimasi Harga (Rp)')" />
+                                <x-text-input id="price_estimation" class="block mt-1 w-full" type="number" name="price_estimation" :value="old('price_estimation', 0)" min="0" step="0.01" />
+                                <x-input-error :messages="$errors->get('price_estimation')" class="mt-2" />
+                            </div>
+                        </div>
+
+                        <div>
+                            <x-input-label for="min_stock" :value="__('Min Stock')" />
+                            <x-text-input id="min_stock" class="block mt-1 w-full" type="number" name="min_stock" :value="old('min_stock', 0)" min="0" />
+                            <x-input-error :messages="$errors->get('min_stock')" class="mt-2" />
+                        </div>
+
+                        <div class="flex items-center gap-4">
+                            <x-primary-button>{{ __('Save Product') }}</x-primary-button>
+                            <a href="{{ route('products.index') }}" class="text-gray-600 hover:text-gray-900">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</x-app-layout>

@@ -29,12 +29,6 @@
                     <x-input-error :messages="$errors->get('code')" class="mt-2" />
                 </div>
 
-                <div class="mb-6">
-                    <x-input-label for="description" value="Deskripsi" />
-                    <textarea id="description" name="description" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500">{{ old('description') }}</textarea>
-                    <x-input-error :messages="$errors->get('description')" class="mt-2" />
-                </div>
-
                 <div class="flex justify-end pt-4 border-t">
                     <x-primary-button>
                         {{ __('Simpan Departemen') }}

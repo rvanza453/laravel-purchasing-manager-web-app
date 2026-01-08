@@ -19,7 +19,8 @@ class PurchaseRequest extends Model
         'status',
         'request_date',
         'description',
-        'total_estimated_cost'
+        'total_estimated_cost',
+        'sub_department_id'
     ];
 
     protected $casts = [
@@ -35,6 +36,11 @@ class PurchaseRequest extends Model
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    public function subDepartment(): BelongsTo
+    {
+        return $this->belongsTo(SubDepartment::class);
     }
 
     public function items(): HasMany

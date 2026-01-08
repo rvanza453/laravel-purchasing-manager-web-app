@@ -17,12 +17,25 @@ class PrApproval extends Model
         'role_name',
         'status',
         'approved_at',
-        'remarks'
+        'remarks',
+        'adjusted_quantities'
     ];
 
     protected $casts = [
         'approved_at' => 'datetime',
+        'adjusted_quantities' => 'array',
     ];
+
+    /**
+     * Get adjusted quantity for a specific item
+     */
+    public function getAdjustedQuantityForItem($itemId)
+    {
+        if (!$this->adjusted_quantities) {
+            return null;
+        }
+        return $this->adjusted_quantities[$itemId] ?? null;
+    }
 
     public function purchaseRequest(): BelongsTo
     {

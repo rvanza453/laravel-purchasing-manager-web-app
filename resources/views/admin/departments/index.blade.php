@@ -1,10 +1,8 @@
 <x-app-layout>
     <div class="space-y-6">
         <div class="flex justify-between items-center">
-            <h2 class="text-2xl font-bold text-gray-800">Manajemen Departemen & Approver</h2>
-            <a href="{{ route('departments.create') }}" class="px-4 py-2 bg-primary-600 text-white rounded-md text-sm font-semibold hover:bg-primary-700 transition">
-                + Tambah Departemen
-            </a>
+            <h2 class="text-2xl font-bold text-gray-800">Konfigurasi Approval Department</h2>
+            
         </div>
 
         <div class="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -31,9 +29,22 @@
                                         <span>{{ $config->role_name }} ({{ $config->user->name }})</span>
                                     </div>
                                 @endforeach
+
+                                @if($department->use_global_approval && $globalApprovers->isNotEmpty())
+                                    <div class="mt-2 pt-2 border-t border-dashed border-gray-200">
+                                        <div class="text-xs font-semibold text-indigo-600 mb-1">Approver HO:</div>
+                                        @php $currentMaxLevel = $department->approverConfigs->max('level') ?? 0; @endphp
+                                        @foreach($globalApprovers as $global)
+                                            <div class="flex items-center gap-2 mb-1">
+                                                <span class="bg-indigo-50 text-indigo-700 text-xs px-2 py-0.5 rounded">Lvl {{ $currentMaxLevel + $global->level }}</span>
+                                                <span class="text-gray-600">{{ $global->role_name }} ({{ $global->user->name }})</span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <a href="{{ route('departments.edit', $department) }}" class="text-primary-600 hover:text-primary-900 mr-3">Edit / Config</a>
+                                <a href="{{ route('departments.edit', $department) }}" class="text-indigo-600 hover:text-indigo-900 mr-3">Config Approval</a>
                             </td>
                         </tr>
                     @empty

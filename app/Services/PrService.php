@@ -28,6 +28,7 @@ class PrService
             $pr = PurchaseRequest::create([
                 'user_id' => auth()->id(),
                 'department_id' => $data['department_id'],
+                'sub_department_id' => $data['sub_department_id'] ?? null, // Add sub_dept
                 'pr_number' => $prNumber,
                 'request_date' => $data['request_date'],
                 'description' => $data['description'],
@@ -59,6 +60,7 @@ class PrService
                     'unit' => $unit,
                     'price_estimation' => $item['price_estimation'],
                     'subtotal' => $subtotal,
+                    'manual_category' => $item['manual_category'] ?? null,
                 ]);
                 $totalCost += $subtotal;
             }
@@ -68,9 +70,10 @@ class PrService
             // 4. Generate Initial Approvals based on Department
             $this->generateApprovals($pr);
 
-            // 5. Deduct Budget Immediately (allow negative)
-            $dept->decrement('budget', $totalCost);
-
+            // 5. Budget is now calculated heavily on validation (PrController), 
+            // no need to decrement a 'budget' column on department table anymore 
+            // as we use the 'budgets' table limits.
+            
             return $pr;
         });
     }
@@ -81,21 +84,32 @@ class PrService
             ->orderBy('level')
             ->get();
 
-        if ($approverConfigs->isEmpty()) {
-            // Auto Approve if no config? Or stuck?
-            // For now, let's keep it pending or maybe set a fallback
-            return; 
-        }
+        $maxLevel = 0;
 
         foreach ($approverConfigs as $config) {
             $pr->approvals()->create([
                 'approver_id' => $config->user_id,
                 'level' => $config->level,
                 'role_name' => $config->role_name,
-                'status' => PrStatus::PENDING->value, // All pending initially, or sequential?
-                // For sequential, only level 1 is "Pending", others "Queued"? 
-                // Let's keep simple: "Pending" but UI only shows to Level 1 first.
+                'status' => PrStatus::PENDING->value,
             ]);
+            $maxLevel = max($maxLevel, $config->level);
+        }
+
+        // Check for Global Approvals (HO)
+        if ($pr->department->use_global_approval) {
+            $globalApprovers = \App\Models\GlobalApproverConfig::orderBy('level')->get();
+            
+            foreach ($globalApprovers as $globalConfig) {
+                $newLevel = $maxLevel + $globalConfig->level;
+
+                $pr->approvals()->create([
+                    'approver_id' => $globalConfig->user_id,
+                    'level' => $newLevel,
+                    'role_name' => $globalConfig->role_name,
+                    'status' => PrStatus::PENDING->value,
+                ]);
+            }
         }
     }
 }

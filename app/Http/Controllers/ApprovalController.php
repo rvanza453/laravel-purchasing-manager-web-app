@@ -19,7 +19,7 @@ class ApprovalController extends Controller
     {
         // Admin can see all pending approvals, regular users see only their assigned approvals
         $query = PrApproval::where('status', 'Pending')
-            ->with(['purchaseRequest.user', 'purchaseRequest.department']);
+            ->with(['purchaseRequest.user', 'purchaseRequest.department', 'purchaseRequest.items']);
         
         if (!auth()->user()->hasRole('admin')) {
             $query->where('approver_id', auth()->id());
@@ -32,19 +32,30 @@ class ApprovalController extends Controller
 
     public function approve(Request $request, PrApproval $approval)
     {
-        // Ensure user owns this approval
-        if ($approval->approver_id !== auth()->id()) {
+        // Ensure user owns this approval OR is Admin
+        if ($approval->approver_id !== auth()->id() && !auth()->user()->hasRole('admin')) {
             abort(403);
         }
 
-        $this->approvalService->approve($approval, $request->input('remarks'));
+        // Validate adjusted quantities if provided (optional for HO approvers)
+        $validated = $request->validate([
+            'remarks' => 'nullable|string',
+            'adjusted_quantities' => 'nullable|array',
+            'adjusted_quantities.*' => 'nullable|numeric|min:0',
+        ]);
+
+        $this->approvalService->approve(
+            $approval, 
+            $request->input('remarks'),
+            $request->input('adjusted_quantities')
+        );
 
         return redirect()->route('approval.index')->with('success', 'PR Approved successfully.');
     }
 
     public function reject(Request $request, PrApproval $approval)
     {
-        if ($approval->approver_id !== auth()->id()) {
+        if ($approval->approver_id !== auth()->id() && !auth()->user()->hasRole('admin')) {
             abort(403);
         }
         

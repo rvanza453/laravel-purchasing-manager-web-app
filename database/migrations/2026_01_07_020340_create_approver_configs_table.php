@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('approver_configs', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('department_id')->constrained()->cascadeOnDelete(); // Was category_id
+            $table->foreignId('department_id')->constrained()->cascadeOnDelete();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete(); 
             $table->string('role_name'); 
             $table->integer('level'); 

@@ -25,7 +25,11 @@
                     </x-nav-link>
 
                     @role('admin')
-                    <x-nav-link :href="route('admin.budget.index')" :active="request()->routeIs('admin.budget.*')">
+                    <x-nav-link :href="route('products.index')" :active="request()->routeIs('products.*')">
+                        {{ __('Products') }}
+                    </x-nav-link>
+
+                    <x-nav-link :href="route('admin.budgets.index')" :active="request()->routeIs('admin.budgets.*')">
                         {{ __('Budget') }}
                     </x-nav-link>
                     @endrole
@@ -94,7 +98,11 @@
             </x-responsive-nav-link>
 
             @role('admin')
-            <x-responsive-nav-link :href="route('admin.budget.index')" :active="request()->routeIs('admin.budget.*')">
+            <x-responsive-nav-link :href="route('sub-departments.index')" :active="request()->routeIs('sub-departments.*')">
+                {{ __('Sub Depts') }}
+            </x-responsive-nav-link>
+
+            <x-responsive-nav-link :href="route('admin.budgets.index')" :active="request()->routeIs('admin.budgets.*')">
                 {{ __('Budget') }}
             </x-responsive-nav-link>
             @endrole

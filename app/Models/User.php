@@ -26,6 +26,7 @@ class User extends Authenticatable
         'site_id',
         'department_id',
         'position',
+        'signature_path',
     ];
 
     /**

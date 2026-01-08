@@ -1,42 +1,112 @@
 <x-app-layout>
     <div class="space-y-6">
-        <h2 class="text-2xl font-bold text-gray-800">Manajemen Budget Departemen</h2>
-
-        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Departemen</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Site</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Sisa Budget</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Update Budget</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    @foreach($departments as $dept)
-                        <tr>
-                            <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $dept->name }} ({{ $dept->code }})</td>
-                            <td class="px-6 py-4 text-sm text-gray-500">{{ $dept->site->name }}</td>
-                            <td class="px-6 py-4 text-sm font-bold text-gray-900 text-right">
-                                Rp {{ number_format($dept->budget, 0, ',', '.') }}
-                            </td>
-                            <td class="px-6 py-4 text-sm text-gray-500 text-right">
-                                <form action="{{ route('admin.budget.update', $dept) }}" method="POST" class="flex items-center justify-end gap-2">
-                                    @csrf
-                                    @method('PATCH')
-                                    <div class="relative rounded-md shadow-sm">
-                                        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                            <span class="text-gray-500 sm:text-sm">Rp</span>
-                                        </div>
-                                        <input type="number" name="budget" value="{{ $dept->budget }}" class="block w-40 rounded-md border-0 py-1.5 pl-10 pr-2 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 text-right" required>
-                                    </div>
-                                    <button type="submit" class="bg-primary-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-primary-700">Simpan</button>
-                                </form>
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
+        <div class="flex justify-between items-center">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-800">Manajemen Budget ({{ $year }})</h2>
+                <nav class="flex text-gray-500 text-sm mt-1" aria-label="Breadcrumb">
+                    <ol class="inline-flex items-center space-x-1 md:space-x-3">
+                        <li class="inline-flex items-center">
+                            <a href="{{ route('admin.budgets.index') }}" class="hover:text-primary-600 {{ !isset($site) && !isset($department) ? 'text-primary-600 font-bold' : '' }}">
+                                Semua Site
+                            </a>
+                        </li>
+                        @if(isset($site))
+                            <li>
+                                <div class="flex items-center">
+                                    <svg class="w-3 h-3 text-gray-400 mx-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 6 10">
+                                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 9 4-4-4-4"/>
+                                    </svg>
+                                    <a href="{{ route('admin.budgets.index', ['site_id' => $site->id]) }}" class="ml-1 hover:text-primary-600 {{ !isset($department) ? 'text-primary-600 font-bold' : '' }} md:ml-2">{{ $site->name }}</a>
+                                </div>
+                            </li>
+                        @endif
+                        @if(isset($department))
+                            <li>
+                                <div class="flex items-center">
+                                    <svg class="w-3 h-3 text-gray-400 mx-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 6 10">
+                                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 9 4-4-4-4"/>
+                                    </svg>
+                                    <span class="ml-1 text-primary-600 font-bold md:ml-2">{{ $department->name }}</span>
+                                </div>
+                            </li>
+                        @endif
+                    </ol>
+                </nav>
+            </div>
         </div>
+
+        @if(!isset($site) && !isset($department))
+            {{-- Level 1: Site List --}}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                @foreach($sites as $s)
+                    <a href="{{ route('admin.budgets.index', ['site_id' => $s->id]) }}" class="group bg-white p-6 rounded-xl shadow-sm border border-transparent hover:border-indigo-500 hover:shadow-md transition-all duration-200">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-4">
+                                <div class="p-3 bg-indigo-50 rounded-lg group-hover:bg-indigo-100 transition-colors">
+                                    <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{{ $s->name }}</h3>
+                                    <p class="text-sm font-semibold text-indigo-600">Rp {{ number_format($s->total_budget, 0, ',', '.') }}</p>
+                                    <p class="text-xs text-gray-500">{{ $s->dept_count }} Departemen</p>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                @endforeach
+            </div>
+        @elseif(isset($site) && !isset($department))
+            {{-- Level 2: Department List --}}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                @foreach($departments as $d)
+                    <a href="{{ route('admin.budgets.index', ['site_id' => $site->id, 'department_id' => $d->id]) }}" class="group bg-white p-6 rounded-xl shadow-sm border border-transparent hover:border-indigo-500 hover:shadow-md transition-all duration-200">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-4">
+                                <div class="p-3 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
+                                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18"/></svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{{ $d->name }}</h3>
+                                    <p class="text-sm font-semibold text-indigo-600">Rp {{ number_format($d->total_budget, 0, ',', '.') }}</p>
+                                    <p class="text-xs text-gray-500">{{ $d->subDepartments->count() }} Sub Departemen</p>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                @endforeach
+            </div>
+        @else
+            {{-- Level 3: Sub Department List Table --}}
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sub Departemen</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total Budget Configured</th>
+                            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        @forelse($subDepartments as $sub)
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800">{{ $sub->name }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold text-indigo-600">
+                                    Rp {{ number_format($sub->budgets->sum('amount'), 0, ',', '.') }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                                    <a href="{{ route('admin.budgets.edit', $sub) }}" class="inline-flex items-center px-3 py-1 bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 transition-colors">
+                                        Manage Budget
+                                    </a>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="3" class="px-6 py-4 text-center text-gray-500">Belum ada sub departemen di departemen ini.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        @endif
     </div>
 </x-app-layout>

@@ -11,7 +11,13 @@ class Department extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['site_id', 'name', 'code', 'budget'];
+    protected $fillable = [
+        'site_id',
+        'name',
+        'code',
+        'budget',
+        'use_global_approval'
+    ];
 
     public function site(): BelongsTo
     {
@@ -21,6 +27,11 @@ class Department extends Model
     public function approverConfigs(): HasMany
     {
         return $this->hasMany(ApproverConfig::class);
+    }
+
+    public function subDepartments(): HasMany
+    {
+        return $this->hasMany(SubDepartment::class);
     }
 
     public function purchaseRequests(): HasMany

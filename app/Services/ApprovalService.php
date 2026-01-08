@@ -9,13 +9,14 @@ use Illuminate\Support\Facades\DB;
 
 class ApprovalService
 {
-    public function approve(PrApproval $approval, string $remarks = null)
+    public function approve(PrApproval $approval, string $remarks = null, array $adjustedQuantities = null)
     {
-         return DB::transaction(function () use ($approval, $remarks) {
+         return DB::transaction(function () use ($approval, $remarks, $adjustedQuantities) {
             $approval->update([
                 'status' => PrStatus::APPROVED->value,
                 'approved_at' => now(),
-                'remarks' => $remarks
+                'remarks' => $remarks,
+                'adjusted_quantities' => $adjustedQuantities
             ]);
 
             // Check if all approvals for this PR are done?

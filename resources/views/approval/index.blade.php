@@ -6,42 +6,50 @@
             @forelse($approvals as $approval)
                 <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden border-l-4 border-yellow-400">
                     <div class="p-5">
-                        <div class="flex justify-between items-start mb-4">
+                        <div class="flex justify-between items-start mb-5">
                             <div>
                                 <span class="text-xs font-semibold text-gray-400 uppercase">PR Number</span>
                                 <h3 class="text-lg font-bold text-gray-800">{{ $approval->purchaseRequest->pr_number }}</h3>
+                                <span class="text-[10px] text-gray-400 font-medium">Diajukan: {{ $approval->purchaseRequest->created_at->format('d M Y') }}</span>
                             </div>
-                            <span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-semibold">Level {{ $approval->level }}</span>
+                            <span class="bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs px-3 py-1.5 rounded-full font-bold shadow-sm">
+                                {{ $approval->approver->name }}
+                            </span>
                         </div>
                         
-                         <div class="space-y-2 mb-4">
+                         <div class="space-y-3 mb-5">
                             <div>
-                                <span class="text-xs text-gray-400 block">Pemohon</span>
-                                <span class="text-sm font-medium">{{ $approval->purchaseRequest->user->name }}</span>
+                                <span class="text-xs text-gray-400 block mb-1">Items Requested</span>
+                                <div class="text-sm font-medium text-gray-800 bg-gray-50 p-2 rounded-md">
+                                    @php
+                                        $itemNames = $approval->purchaseRequest->items->pluck('item_name');
+                                        $displayItems = $itemNames->take(2)->implode(', ');
+                                        $remainingCount = $itemNames->count() - 2;
+                                    @endphp
+                                    {{ $displayItems }}
+                                    @if($remainingCount > 0)
+                                        <span class="text-gray-500 text-xs italic">+ {{ $remainingCount }} more</span>
+                                    @endif
+                                </div>
                             </div>
-                            <div>
-                                <span class="text-xs text-gray-400 block">Departemen</span>
-                                <span class="text-sm text-gray-600">{{ $approval->purchaseRequest->department->name ?? '-' }}</span>
-                            </div>
-                            <div>
-                                <span class="text-xs text-gray-400 block">Total Estimasi</span>
-                                <span class="text-sm font-bold text-gray-800">Rp {{ number_format($approval->purchaseRequest->total_estimated_cost, 0, ',', '.') }}</span>
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <span class="text-xs text-gray-400 block">Pemohon</span>
+                                    <span class="text-sm font-medium">{{ $approval->purchaseRequest->user->name }}</span>
+                                    <div class="text-xs text-gray-500">{{ $approval->purchaseRequest->department->name ?? '-' }}</div>
+                                </div>
+                                <div>
+                                    <span class="text-xs text-gray-400 block">Total Estimasi</span>
+                                    <span class="text-lg font-bold text-gray-900">Rp {{ number_format($approval->purchaseRequest->total_estimated_cost, 0, ',', '.') }}</span>
+                                </div>
                             </div>
                         </div>
                         
                         <div class="flex gap-2 pt-4 border-t border-gray-100">
-                             <a href="{{ route('pr.show', $approval->purchaseRequest) }}" class="flex-1 text-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium transition">
-                                Detail
+                            <a href="{{ route('pr.show', $approval->purchaseRequest) }}" class="flex-1 text-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium transition">
+                                Detail & Approval
                             </a>
-                            <button onclick="openRejectModal({{ $approval->id }})" class="flex-1 px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm font-medium transition">
-                                Reject
-                            </button>
-                            <form action="{{ route('approval.approve', $approval) }}" method="POST" class="flex-1">
-                                @csrf
-                                <button type="submit" class="w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium transition">
-                                    Approve
-                                </button>
-                            </form>
                         </div>
                     </div>
                 </div>
@@ -53,32 +61,4 @@
             @endforelse
         </div>
     </div>
-
-    <!-- Reject Modal -->
-    <div id="rejectModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">Konfirmasi Reject</h3>
-            <form id="rejectForm" method="POST">
-                @csrf
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Alasan Penolakan</label>
-                    <textarea name="remarks" required class="w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
-                </div>
-                <div class="flex justify-end gap-3">
-                    <button type="button" onclick="document.getElementById('rejectModal').classList.add('hidden')" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Batal</button>
-                    <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Reject PR</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <script>
-        function openRejectModal(id) {
-            const modal = document.getElementById('rejectModal');
-            const form = document.getElementById('rejectForm');
-            form.action = `/approvals/${id}/reject`; // Adjust route if needed
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        }
-    </script>
 </x-app-layout>

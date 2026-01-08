@@ -1,4 +1,22 @@
 <x-app-layout>
+    @php
+        // Find the next approval step (lowest level pending)
+        $nextApproval = $pr->approvals->where('status', 'Pending')->sortBy('level')->first();
+        
+        $canApprove = false;
+        $currentApproval = null;
+        
+        if ($nextApproval) {
+            // Check permissions: Owner OR Admin
+            if (auth()->id() === $nextApproval->approver_id || auth()->user()->hasRole('admin')) {
+                $canApprove = true;
+                $currentApproval = $nextApproval;
+            }
+        }
+        
+        $isHO = auth()->user()->hasRole('admin'); 
+    @endphp
+
     <div class="max-w-4xl mx-auto space-y-6">
         <!-- Header -->
         <div class="flex justify-between items-start">
@@ -6,7 +24,7 @@
                 <h2 class="text-2xl font-bold text-gray-800">Detail Pengajuan PR</h2>
                 <div class="text-sm text-gray-500">Nomor: {{ $pr->pr_number }}</div>
             </div>
-            <div>
+            <div class="flex items-center gap-3">
                 @php
                     $statusColor = match($pr->status) {
                         'Pending' => 'bg-yellow-100 text-yellow-800',
@@ -18,11 +36,35 @@
                 <span class="px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full {{ $statusColor }}">
                     {{ $pr->status }}
                 </span>
+                
+                @if($pr->status === 'Approved')
+                    <a href="{{ route('pr.export.pdf', $pr) }}" 
+                       class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium transition inline-flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        Export PDF
+                    </a>
+                @endif
             </div>
         </div>
 
         <!-- Details Card -->
         <div class="bg-white rounded-xl shadow-sm p-6 space-y-4">
+            @if(isset($budgetWarnings) && count($budgetWarnings) > 0)
+                <div class="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
+                    <div class="font-bold flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        Peringatan Budget:
+                    </div>
+                    <ul class="list-disc list-inside text-sm mt-1">
+                        @foreach($budgetWarnings as $warning)
+                            <li>{!! $warning !!}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+            
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <span class="block text-xs text-gray-400 uppercase">Pemohon</span>
@@ -48,6 +90,11 @@
             </div>
         </div>
 
+        @if($canApprove)
+        <form method="POST" id="approval-form">
+            @csrf
+        @endif
+
         <!-- Items Table -->
         <div class="bg-white rounded-xl shadow-sm overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-100 bg-gray-50">
@@ -57,7 +104,12 @@
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Barang</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty Original</th>
+                        @if($canApprove && $isHO)
+                           <th class="px-6 py-3 text-left text-xs font-medium text-blue-600 uppercase tracking-wider bg-blue-50">Adjust Qty</th>
+                        @else
+                           <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty Final</th>
+                        @endif
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Satuan</th>
                         <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Estimasi</th>
                         <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
@@ -72,7 +124,37 @@
                                     <div class="text-xs text-gray-500 mt-0.5">{{ $item->specification }}</div>
                                 @endif
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-900">{{ $item->quantity }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-900">
+                                {{ $item->quantity }}
+                            </td>
+                            
+                            @if($canApprove && $isHO)
+                                <td class="px-6 py-4 text-sm text-gray-900 bg-blue-50">
+                                    <input type="number" 
+                                           name="adjusted_quantities[{{ $item->id }}]" 
+                                           class="w-24 border-blue-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm" 
+                                           min="0" 
+                                           step="1"
+                                           value="{{ $item->getFinalQuantity() }}">
+                                </td>
+                            @else
+                                <td class="px-6 py-4 text-sm text-gray-900">
+                                    @php
+                                        $finalQty = $item->getFinalQuantity();
+                                        $hasAdjustment = $finalQty != $item->quantity;
+                                    @endphp
+                                    
+                                    @if($hasAdjustment)
+                                        <div class="flex items-center gap-2">
+                                            <svg class="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                            <span class="font-bold text-blue-600">{{ $finalQty }}</span>
+                                        </div>
+                                    @else
+                                        -
+                                    @endif
+                                </td>
+                            @endif
+
                             <td class="px-6 py-4 text-sm text-gray-500">{{ $item->unit }}</td>
                             <td class="px-6 py-4 text-sm text-gray-900 text-right">Rp {{ number_format($item->price_estimation, 0, ',', '.') }}</td>
                             <td class="px-6 py-4 text-sm font-medium text-gray-900 text-right">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</td>
@@ -81,6 +163,45 @@
                 </tbody>
             </table>
         </div>
+        
+        @if($canApprove)
+            <!-- Approval Actions -->
+            <div class="bg-white rounded-xl shadow-sm p-6 space-y-4">
+                <h3 class="text-lg font-bold text-gray-800">Tindakan Approval</h3>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Catatan / Alasan (Opsional untuk Approve, Wajib untuk Reject)</label>
+                    <textarea name="remarks" id="remarks-input" rows="3" class="w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500" placeholder="Tulis catatan disini..."></textarea>
+                </div>
+                
+                <div class="flex justify-end gap-3 pt-2">
+                     <button type="submit" 
+                             formaction="{{ route('approval.reject', $currentApproval->id) }}"
+                             onclick="return validateReject()"
+                             class="px-6 py-2.5 bg-red-50 text-red-600 font-medium rounded-lg hover:bg-red-100 transition focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
+                         Reject PR
+                     </button>
+                     <button type="submit" 
+                             formaction="{{ route('approval.approve', $currentApproval->id) }}"
+                             class="px-6 py-2.5 bg-primary-600 text-white font-bold rounded-lg hover:bg-primary-700 transition shadow-md hover:shadow-lg focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 flex items-center gap-2">
+                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                         Approve PR
+                     </button>
+                </div>
+            </div>
+        </form>
+        
+        <script>
+            function validateReject() {
+                const remarks = document.getElementById('remarks-input').value;
+                if (!remarks.trim()) {
+                    alert('Mohon isi catatan/alasan untuk melakukan Reject.');
+                    document.getElementById('remarks-input').focus();
+                    return false;
+                }
+                return confirm('Apakah Anda yakin ingin MENOLAK pengajuan ini?');
+            }
+        </script>
+        @endif
 
         <!-- Approval Timeline -->
         <div class="bg-white rounded-xl shadow-sm p-6">
