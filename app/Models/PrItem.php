@@ -10,7 +10,7 @@ class PrItem extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['purchase_request_id', 'product_id', 'item_name', 'specification', 'quantity', 'unit', 'price_estimation', 'subtotal', 'manual_category'];
+    protected $fillable = ['purchase_request_id', 'product_id', 'item_name', 'specification', 'quantity', 'unit', 'price_estimation', 'subtotal', 'manual_category', 'url_link'];
 
     public function purchaseRequest(): BelongsTo
     {

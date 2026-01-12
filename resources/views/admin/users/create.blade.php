@@ -90,3 +90,24 @@
         </div>
     </div>
 </x-app-layout>
+
+<script>
+    document.getElementById('site_id').addEventListener('change', function() {
+        const siteId = this.value;
+        const deptSelect = document.getElementById('department_id');
+        
+        // Reset dropdown
+        deptSelect.innerHTML = '<option value="">Pilih Departemen (Opsional)</option>';
+        
+        if (siteId) {
+            fetch(`/api/sites/${siteId}/departments`)
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach(dept => {
+                        deptSelect.innerHTML += `<option value="${dept.id}">${dept.name}</option>`;
+                    });
+                })
+                .catch(error => console.error('Error fetching departments:', error));
+        }
+    });
+</script>

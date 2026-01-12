@@ -50,25 +50,32 @@
         <h3 class="text-lg font-bold text-gray-800">Department Budget Summary</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             @foreach($departmentBudgets as $dept)
-                <div class="bg-white rounded-xl shadow-sm p-4 border-l-4 {{ $dept->budget < 0 ? 'border-red-500' : 'border-green-500' }}">
+                <div class="bg-white rounded-xl shadow-sm p-4 border-l-4 {{ $dept->remaining_budget < 0 ? 'border-red-500' : 'border-green-500' }}">
                     <div class="flex justify-between items-start">
                         <div>
                             <h4 class="text-sm font-semibold text-gray-500 uppercase">{{ $dept->name }}</h4>
                             <span class="text-xs text-gray-400">{{ $dept->site->name }}</span>
                         </div>
-                        <span class="text-xs font-bold px-2 py-1 rounded {{ $dept->budget < 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700' }}">
-                            {{ $dept->budget < 0 ? 'Over Budget' : 'Safe' }}
+                        <span class="text-xs font-bold px-2 py-1 rounded {{ $dept->remaining_budget < 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700' }}">
+                            {{ $dept->remaining_budget < 0 ? 'Over Budget' : 'Safe' }}
                         </span>
                     </div>
                     <div class="mt-3">
-                        <span class="block text-2xl font-bold {{ $dept->budget < 0 ? 'text-red-600' : 'text-gray-800' }}">
-                            Rp {{ number_format($dept->budget, 0, ',', '.') }}
+                        <span class="block text-2xl font-bold {{ $dept->remaining_budget < 0 ? 'text-red-600' : 'text-gray-800' }}">
+                            Rp {{ number_format($dept->remaining_budget, 0, ',', '.') }}
                         </span>
-                        <span class="text-xs text-gray-500">Remaining Balance</span>
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>Remaining Balance</span>
+                            <span title="Allocated: {{ number_format($dept->calculated_budget) }} | Used: {{ number_format($dept->used_budget) }}">
+                                (Alloc: {{ number_format($dept->calculated_budget, 0, ',', '.') }})
+                            </span>
+                        </div>
                     </div>
                 </div>
             @endforeach
         </div>
+
+        <img src="https://id.shp.ee/JRHaMRx" alt="Dashboard">
 
     </div>
 </x-app-layout>

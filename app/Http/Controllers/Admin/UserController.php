@@ -12,7 +12,12 @@ class UserController extends Controller
      */
     public function index()
     {
-        $users = \App\Models\User::with(['roles', 'site', 'department'])->orderBy('name')->get();
+        $users = \App\Models\User::with(['roles', 'site', 'department'])
+                    ->orderBy('name')
+                    ->get()
+                    ->groupBy(function($user) {
+                        return $user->site->name ?? 'No Site';
+                    });
         return view('admin.users.index', compact('users'));
     }
 
@@ -54,7 +59,14 @@ class UserController extends Controller
     {
         $roles = \Spatie\Permission\Models\Role::all();
         $sites = \App\Models\Site::all();
-        $departments = \App\Models\Department::all();
+        
+        // Filter departments based on user's site
+        if ($user->site_id) {
+            $departments = \App\Models\Department::where('site_id', $user->site_id)->orderBy('name')->get();
+        } else {
+            $departments = \Illuminate\Database\Eloquent\Collection::make(); // Empty if no site
+        }
+        
         return view('admin.users.edit', compact('user', 'roles', 'sites', 'departments'));
     }
 

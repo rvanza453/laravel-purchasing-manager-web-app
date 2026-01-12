@@ -7,49 +7,71 @@
             </a>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Site / Dept</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Posisi</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    @foreach($users as $user)
-                        <tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $user->name }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $user->email }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                @foreach($user->roles as $role)
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                                        {{ ucfirst($role->name) }}
-                                    </span>
+        <div class="space-y-4">
+            @forelse($users as $siteName => $siteUsers)
+                <div x-data="{ open: true }" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <button @click="open = !open" class="w-full flex justify-between items-center px-6 py-4 bg-gray-50 hover:bg-gray-100 transition-colors border-b border-gray-200">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-gray-800 text-lg">{{ $siteName }}</span>
+                            <span class="bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full text-xs font-medium">{{ $siteUsers->count() }} Pengguna</span>
+                        </div>
+                        <svg class="w-4 h-4 text-gray-400 transform transition-transform duration-200" style="width: 16px; height: 16px;" :class="{'rotate-180': open, 'rotate-0': !open}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    
+                    <div x-show="open" x-transition class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-white">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-1/4">Nama</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-1/4">Email</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-1/6">Role</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-1/6">Dept / Posisi</th>
+                                    <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-1/6">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                @foreach($siteUsers as $user)
+                                    <tr class="hover:bg-gray-50 transition-colors">
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm font-medium text-gray-900">{{ $user->name }}</div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $user->email }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            @foreach($user->roles as $role)
+                                                <span class="px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                                    {{ ucfirst($role->name) }}
+                                                </span>
+                                            @endforeach
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <div class="font-medium text-gray-700">{{ $user->department->name ?? '-' }}</div>
+                                            <div class="text-xs text-gray-400">{{ $user->position ?? '-' }}</div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-center">
+                                            <div class="flex justify-center items-center gap-2">
+                                                <a href="{{ route('users.edit', $user) }}" class="p-1 text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 rounded">
+                                                    <svg class="w-4 h-4" style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                                </a>
+                                                <form action="{{ route('users.destroy', $user) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus user ini?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="p-1 text-red-600 hover:text-red-900 hover:bg-red-50 rounded">
+                                                        <svg class="w-4 h-4" style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
                                 @endforeach
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                <div>{{ $user->site->name ?? '-' }}</div>
-                                <div class="text-xs text-gray-400">{{ $user->department->name ?? '-' }}</div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $user->position }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <div class="flex items-center gap-2">
-                                    <a href="{{ route('users.edit', $user) }}" class="text-indigo-600 hover:text-indigo-900">Edit</a>
-                                    <form action="{{ route('users.destroy', $user) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus user ini?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="text-red-600 hover:text-red-900 ml-2">Hapus</button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            @empty
+                <div class="bg-white rounded-xl shadow-sm p-10 text-center text-gray-500">
+                    Belum ada data pengguna.
+                </div>
+            @endforelse
         </div>
     </div>
 </x-app-layout>

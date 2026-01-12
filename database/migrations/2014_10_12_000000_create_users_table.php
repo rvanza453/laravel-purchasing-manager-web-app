@@ -16,10 +16,8 @@ return new class extends Migration
             $table->string('password');
             $table->rememberToken();
             $table->timestamps();
-            
-            // Custom fields that don't depend on other tables yet
-             $table->boolean('is_active')->default(true);
-             $table->string('position')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->string('position')->nullable();
         });
     }
 

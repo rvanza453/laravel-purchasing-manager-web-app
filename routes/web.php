@@ -25,23 +25,25 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile/signature', [ProfileController::class, 'deleteSignature'])->name('profile.signature.delete');
 
     // Admin Routes
-    // Admin Routes
-    Route::resource('departments', \App\Http\Controllers\Admin\DepartmentController::class);
-    Route::resource('master-departments', \App\Http\Controllers\Admin\MasterDepartmentController::class);
-    Route::resource('sub-departments', \App\Http\Controllers\Admin\SubDepartmentController::class);
-    Route::resource('users', \App\Http\Controllers\Admin\UserController::class);
-    Route::resource('global-approvers', \App\Http\Controllers\Admin\GlobalApproverController::class);
-    Route::resource('products', \App\Http\Controllers\Admin\ProductController::class);
-    
-    // Budget Routes
-    Route::get('/admin/budgets', [\App\Http\Controllers\Admin\BudgetController::class, 'index'])->name('admin.budgets.index');
-    Route::get('/admin/budgets/{subDepartment}/edit', [\App\Http\Controllers\Admin\BudgetController::class, 'edit'])->name('admin.budgets.edit');
-    Route::put('/admin/budgets/{subDepartment}', [\App\Http\Controllers\Admin\BudgetController::class, 'update'])->name('admin.budgets.update');
+    Route::middleware('role:admin')->group(function () {
+        Route::resource('departments', \App\Http\Controllers\Admin\DepartmentController::class);
+        Route::resource('master-departments', \App\Http\Controllers\Admin\MasterDepartmentController::class);
+        Route::resource('sub-departments', \App\Http\Controllers\Admin\SubDepartmentController::class);
+        Route::resource('users', \App\Http\Controllers\Admin\UserController::class);
+        Route::resource('global-approvers', \App\Http\Controllers\Admin\GlobalApproverController::class);
+        Route::resource('products', \App\Http\Controllers\Admin\ProductController::class);
+        
+        // Budget Routes
+        Route::get('/admin/budgets', [\App\Http\Controllers\Admin\BudgetController::class, 'index'])->name('admin.budgets.index');
+        Route::get('/admin/budgets/{subDepartment}/edit', [\App\Http\Controllers\Admin\BudgetController::class, 'edit'])->name('admin.budgets.edit');
+        Route::put('/admin/budgets/{subDepartment}', [\App\Http\Controllers\Admin\BudgetController::class, 'update'])->name('admin.budgets.update');
+    });
 
     // PR Routes
     Route::resource('pr', PrController::class);
     Route::get('/pr/{purchaseRequest}/export-pdf', [\App\Http\Controllers\PrPdfController::class, 'export'])->name('pr.export.pdf');
     Route::get('/api/budget/{subDepartment}', [PrController::class, 'getBudgetStatus'])->name('api.budget.status');
+    Route::get('/api/sites/{site}/departments', [\App\Http\Controllers\Admin\DepartmentController::class, 'getDepartmentsBySite'])->name('api.sites.departments');
     
     // Approval Routes
     Route::get('/approvals', [ApprovalController::class, 'index'])->name('approval.index');

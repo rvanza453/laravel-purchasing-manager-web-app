@@ -4,6 +4,10 @@
     <meta charset="utf-8">
     <title>Purchase Request - {{ $pr->pr_number }}</title>
     <style>
+        @page {
+            margin: 2cm 2.5cm; /* Vertikal 2cm, Horizontal 2.5cm */
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -15,7 +19,7 @@
             font-size: 9pt;
             line-height: 1.3;
             color: #000;
-            padding: 15px;
+            padding: 40px; /* Tambahan padding internal */
         }
         
         .header {
@@ -99,13 +103,24 @@
         }
         
         .budget-info {
-            font-size: 7pt;
-            line-height: 1.4;
+            font-size: 8pt;
         }
         
-        .budget-info .budget-label {
-            display: inline-block;
-            width: 120px;
+        .budget-info .label {
+            font-weight: normal;
+            text-align: right;
+            padding-right: 5px;
+        }
+        
+        .budget-info .colon {
+            width: 10px;
+            text-align: center;
+        }
+        
+        .budget-info .value {
+            font-weight: bold;
+            text-align: left;
+            padding-left: 5px;
         }
         
         .items-table {
@@ -189,10 +204,10 @@
         .signature-box {
             display: table-cell;
             text-align: center;
-            padding: 5px;
+            padding: 3px;
             vertical-align: top;
-            border: 1px solid #000;
-            font-size: 7pt;
+            border: none;
+            font-size: 6pt;
         }
         
         .signature-role {
@@ -201,32 +216,57 @@
         }
         
         .signature-img-container {
-            height: 40px;
-            margin: 5px 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            position: absolute;
+            top: -15px; /* Offset to float above the line */
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            width: 100%;
+            text-align: center;
         }
         
         .signature-img {
-            max-height: 35px;
-            max-width: 80px;
+            max-height: 55px;
+            max-width: 90%;
+            opacity: 0.85; /* Keep text visible underneath */
         }
         
         .signature-name {
             font-weight: bold;
             border-top: 1px solid #000;
             display: inline-block;
-            min-width: 80px;
-            padding-top: 2px;
-            margin-top: 3px;
-            font-size: 7pt;
+            width: 90%;
+            padding-top: 1px;
+            font-size: 6pt;
+            position: relative;
+            z-index: 2;
+            margin-top: 30px; /* Create space for the signature above it */
+            line-height: 1.1;
+        }
+
+        .signature-position {
+            font-size: 6pt;
+            margin-top: 1px;
+            position: relative;
+            z-index: 2;
         }
         
         .signature-date {
-            font-size: 6pt;
-            color: #666;
-            margin-top: 2px;
+            font-size: 5pt;
+            color: #444;
+            margin-top: 1px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .footer-approved {
+            position: fixed;
+            bottom: 1cm;
+            right: 2.5cm;
+            font-size: 8pt;
+            color: #000;
+            text-align: right;
+            font-style: italic;
         }
         
         .total-row {
@@ -242,10 +282,10 @@
             <img src="{{ public_path('images/saraswantiLogo.png') }}" alt="Saraswanti Logo">
         </div>
         <div class="header-center">
-            <h1>PURCHASING REQUEST</h1>
+            <h1>LEMBAR PERMINTAAN PEMBELIAN BARANG</h1>
         </div>
         <div class="header-right">
-            <strong>No. PP:</strong>
+            <strong>No. PP: {{ $pr->pr_number }}</strong>
         </div>
     </div>
 
@@ -263,7 +303,7 @@
                 </tr>
                 <tr>
                     <td class="label">Jenis/Pekerjaan/Unit/Stadium/Kategori</td>
-                    <td class="value">: {{ $pr->subDepartment->name ?? '-' }}</td>
+                    <td class="value">: {{ ($pr->department->name ?? '-') . ' / ' . ($pr->subDepartment->name ?? '-') }}</td>
                 </tr>
                 <tr>
                     <td class="label">No. PP</td>
@@ -272,14 +312,43 @@
             </table>
         </div>
         <div class="info-right">
-            <div class="budget-info">
-                <div><span class="budget-label">Total Anggaran</span>: <strong>Rp {{ number_format($budgetInfo['total'], 0, ',', '.') }}</strong></div>
-                <div><span class="budget-label">Actual Pengeluaran</span>: <strong>Rp {{ number_format($budgetInfo['actual'], 0, ',', '.') }}</strong></div>
-                <div><span class="budget-label">Permintaan Saat Ini</span>: <strong>Rp {{ number_format($budgetInfo['current'], 0, ',', '.') }}</strong></div>
-                <div><span class="budget-label">Saldo Anggaran</span>: <strong>Rp {{ number_format($budgetInfo['saldo'], 0, ',', '.') }}</strong></div>
-            </div>
+            <table class="info-table budget-info" style="width: auto; margin-left: auto;">
+                <tr>
+                    <td class="label">Total Anggaran</td>
+                    <td class="colon">:</td>
+                    <td class="value">Rp {{ number_format($budgetInfo['total'], 0, ',', '.') }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Actual Pengeluaran</td>
+                    <td class="colon">:</td>
+                    <td class="value">Rp {{ number_format($budgetInfo['actual'], 0, ',', '.') }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Permintaan Saat Ini</td>
+                    <td class="colon">:</td>
+                    <td class="value">Rp {{ number_format($budgetInfo['current'], 0, ',', '.') }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Saldo Anggaran</td>
+                    <td class="colon">:</td>
+                    <td class="value">Rp {{ number_format($budgetInfo['saldo'], 0, ',', '.') }}</td>
+                </tr>
+            </table>
         </div>
     </div>
+
+    @php
+        // Distinguish HO and Department approvals using GlobalApproverConfig
+        $hoUserIds = \App\Models\GlobalApproverConfig::pluck('user_id')->toArray();
+        
+        $hoApprovals = $approvals->filter(function($a) use ($hoUserIds) {
+            return in_array($a->approver_id, $hoUserIds);
+        })->sortBy('level');
+        
+        $deptApprovals = $approvals->reject(function($a) use ($hoUserIds) {
+            return in_array($a->approver_id, $hoUserIds);
+        })->sortBy('level');
+    @endphp
 
     <!-- Items Table -->
     <table class="items-table">
@@ -289,7 +358,7 @@
                 <th rowspan="2" class="code-col">Kode<br>Barang</th>
                 <th rowspan="2" class="name-col">Nama Barang</th>
                 <th rowspan="2" class="spec-col">Detail Spesifikasi</th>
-                <th colspan="6">Kuantitas</th>
+                <th colspan="{{ 3 + count($hoApprovals) }}">Kuantitas</th>
                 <th colspan="3">Kuantitas Disetujui</th>
                 <th rowspan="2" class="price-col">Total Harga (Rp)</th>
                 <th rowspan="2" class="note-col">Keterangan</th>
@@ -298,9 +367,14 @@
                 <th class="sub-header qty-col">Sat.</th>
                 <th class="sub-header qty-col">Pengajuan</th>
                 <th class="sub-header qty-col">Stock</th>
-                <th class="sub-header qty-col">Mgr</th>
-                <th class="sub-header qty-col">FPD</th>
-                <th class="sub-header qty-col">DCOO</th>
+                @foreach($hoApprovals as $ho)
+                    @php
+                        // Dynamically fetch current config role to be safer against historical data
+                        $currentConfig = \App\Models\GlobalApproverConfig::where('user_id', $ho->approver_id)->first();
+                        $roleToDisplay = $currentConfig ? $currentConfig->role_name : $ho->role_name;
+                    @endphp
+                    <th class="sub-header qty-col">{{ $roleToDisplay }}</th>
+                @endforeach
                 <th class="sub-header qty-col">Anggaran</th>
                 <th class="sub-header qty-col">Pengajuan</th>
                 <th class="sub-header qty-col">Total</th>
@@ -310,25 +384,6 @@
             @foreach($pr->items as $index => $item)
             @php
                 $finalQty = $item->getFinalQuantity();
-                
-                // Get approval quantities by level/role
-                $mgrQty = '';
-                $fpdQty = '';
-                $dcooQty = '';
-                
-                foreach($pr->approvals as $approval) {
-                    if($approval->adjusted_quantities && isset($approval->adjusted_quantities[$item->id])) {
-                        $adjQty = $approval->adjusted_quantities[$item->id];
-                        // Map by role name or level
-                        if(stripos($approval->role_name, 'manager') !== false) {
-                            $mgrQty = $adjQty;
-                        } elseif(stripos($approval->role_name, 'fpd') !== false || stripos($approval->role_name, 'epd') !== false) {
-                            $fpdQty = $adjQty;
-                        } elseif(stripos($approval->role_name, 'coo') !== false || stripos($approval->role_name, 'dcoo') !== false) {
-                            $dcooQty = $adjQty;
-                        }
-                    }
-                }
                 
                 // Anggaran: Estimasi harga bila ada di product (dari product price_estimation)
                 $anggaranPrice = $item->product && $item->product->price_estimation ? $item->product->price_estimation : 0;
@@ -349,9 +404,9 @@
                 <td class="text-center">{{ $item->unit ?? '-' }}</td>
                 <td class="text-center">{{ $item->quantity }}</td>
                 <td class="text-center">-</td>
-                <td class="text-center">{{ $mgrQty }}</td>
-                <td class="text-center">{{ $fpdQty }}</td>
-                <td class="text-center">{{ $dcooQty }}</td>
+                @foreach($hoApprovals as $ho)
+                    <td class="text-center">{{ $ho->adjusted_quantities[$item->id] ?? '-' }}</td>
+                @endforeach
                 <td class="text-right">{{ $anggaranPrice > 0 ? number_format($anggaranPrice, 0, ',', '.') : '-' }}</td>
                 <td class="text-right">{{ number_format($pengajuanPrice, 0, ',', '.') }}</td>
                 <td class="text-center">{{ $finalQty }}</td>
@@ -361,11 +416,11 @@
             @endforeach
             
             <tr class="total-row">
-                <td colspan="13" class="text-right">Total Anggaran: Rp {{ number_format($budgetInfo['total'], 0, ',', '.') }}</td>
+                <td colspan="{{ 10 + count($hoApprovals) }}" class="text-right">Total Anggaran: Rp {{ number_format($budgetInfo['total'], 0, ',', '.') }}</td>
                 <td colspan="2"></td>
             </tr>
             <tr>
-                <td colspan="13" class="text-right" style="font-size: 7pt;">
+                <td colspan="{{ 10 + count($hoApprovals) }}" class="text-right" style="font-size: 7pt;">
                     Actual: Rp {{ number_format($budgetInfo['actual'], 0, ',', '.') }} | 
                     Permintaan: Rp {{ number_format($budgetInfo['current'], 0, ',', '.') }} | 
                     Saldo: Rp {{ number_format($budgetInfo['saldo'], 0, ',', '.') }}
@@ -376,84 +431,139 @@
     </table>
 
     <!-- Signatures -->
-    <div class="signatures">
-        <div class="signature-row">
-            <div class="signature-box" style="width: 50%;">
-                <div class="signature-role">Diperiksa Oleh</div>
-                <div class="signature-img-container"></div>
-                <div class="signature-name">_________________</div>
-            </div>
-            <div class="signature-box" style="width: 50%;">
-                <div class="signature-role">Disetujui Oleh,</div>
-                <div class="signature-img-container"></div>
-                <div class="signature-name">_________________</div>
-            </div>
-        </div>
+    <div class="signatures" style="margin-top: 20px;">
         
-        <div class="signature-row">
-            @php
-                // Define fixed positions for specific roles
-                $rolePositions = [
-                    'KTU' => null,
-                    'Estate Manager' => null,
-                    'Finance' => null,
-                    'Cost Control' => null,
-                    'Head EPD' => null,
-                    'Deputy COO' => null
-                ];
-                
-                // Fill in approvers
-                foreach($approvals as $approval) {
-                    $roleName = $approval->role_name;
-                    if(stripos($roleName, 'ktu') !== false) {
-                        $rolePositions['KTU'] = $approval;
-                    } elseif(stripos($roleName, 'estate') !== false || stripos($roleName, 'manager') !== false) {
-                        $rolePositions['Estate Manager'] = $approval;
-                    } elseif(stripos($roleName, 'finance') !== false) {
-                        $rolePositions['Finance'] = $approval;
-                    } elseif(stripos($roleName, 'cost') !== false) {
-                        $rolePositions['Cost Control'] = $approval;
-                    } elseif(stripos($roleName, 'epd') !== false) {
-                        $rolePositions['Head EPD'] = $approval;
-                    } elseif(stripos($roleName, 'coo') !== false) {
-                        $rolePositions['Deputy COO'] = $approval;
-                    }
-                }
-            @endphp
-            
-            @foreach($rolePositions as $role => $approval)
-            <div class="signature-box" style="width: 16.66%;">
-                <div class="signature-role">{{ $role }}</div>
-                <div class="signature-img-container">
-                    @if($approval && $approval->approver->signature_path)
+        <!-- Row 1: Site Approvals (Diperiksa Oleh) -->
+        <div style="width: 100%; margin-bottom: 30px;">
+            <div style="text-align: center; margin-bottom: 10px; font-weight: bold; font-size: 8pt;">Diperiksa Oleh,</div>
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                @foreach($deptApprovals as $approval)
+                    <td style="width: {{ 100 / max(count($deptApprovals), 1) }}%; text-align: center; vertical-align: top; padding: 2px; font-size: 6pt;">
                         @php
-                            $signaturePath = storage_path('app/public/' . $approval->approver->signature_path);
-                            if(file_exists($signaturePath)) {
-                                $imageData = base64_encode(file_get_contents($signaturePath));
-                                $imageMime = mime_content_type($signaturePath);
-                                $base64Image = 'data:' . $imageMime . ';base64,' . $imageData;
-                            } else {
-                                $base64Image = null;
-                            }
+                            $config = \App\Models\ApproverConfig::where('department_id', $pr->department_id)->where('user_id', $approval->approver_id)->first();
+                            $roleToDisplay = $config ? $config->role_name : $approval->role_name;
                         @endphp
-                        @if(isset($base64Image) && $base64Image)
-                            <img src="{{ $base64Image }}" alt="Signature" class="signature-img">
-                        @endif
-                    @endif
-                </div>
-                <div class="signature-name">
-                    @if($approval)
-                        {{ $approval->approver->name }}
-                    @else
-                        _________
-                    @endif
-                </div>
-                @if($approval)
-                <div class="signature-date">{{ $approval->approved_at->format('d/m/Y') }}</div>
-                @endif
-            </div>
-            @endforeach
+                        <div class="signature-role" style="margin-bottom: 5px;">{{ $roleToDisplay }}</div>
+                        <div style="height: 55px; position: relative;">
+                            <div class="signature-img-container">
+                                @if($approval->approver->signature_path)
+                                    @php
+                                        $signaturePath = storage_path('app/public/' . $approval->approver->signature_path);
+                                        if(file_exists($signaturePath)) {
+                                            $imageData = base64_encode(file_get_contents($signaturePath));
+                                            $imageMime = mime_content_type($signaturePath);
+                                            $base64Image = 'data:' . $imageMime . ';base64,' . $imageData;
+                                        } else {
+                                            $base64Image = null;
+                                        }
+                                    @endphp
+                                    @if(isset($base64Image) && $base64Image)
+                                        <img src="{{ $base64Image }}" alt="Signature" class="signature-img">
+                                    @endif
+                                @endif
+                            </div>
+                            <div class="signature-name">{{ $approval->approver->name }}</div>
+                            <div class="signature-position">{{ $approval->approver->position }}</div>
+                            <div class="signature-date">{{ $approval->approved_at->format('d/m/Y') }}</div>
+                        </div>
+                    </td>
+                @endforeach
+                </tr>
+            </table>
+        </div>
+
+        <!-- Row 2: HO Approvals (Disetujui Oleh) -->
+        <div style="width: 100%;">
+            <div style="text-align: center; margin-bottom: 10px; font-weight: bold; font-size: 8pt;">Disetujui Oleh,</div>
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                @foreach($hoApprovals->sortBy('level') as $approval)
+                    <td style="width: {{ 100 / max(count($hoApprovals), 1) }}%; text-align: center; vertical-align: top; padding: 2px; font-size: 6pt;">
+                        @php
+                            $config = \App\Models\GlobalApproverConfig::where('user_id', $approval->approver_id)->first();
+                            $roleToDisplay = $config ? $config->role_name : $approval->role_name;
+                        @endphp
+                        <div class="signature-role" style="margin-bottom: 5px;">{{ $roleToDisplay }}</div>
+                        <div style="height: 55px; position: relative;">
+                            <div class="signature-img-container">
+                                    @if($approval->approver->signature_path)
+                                    @php
+                                        $signaturePath = storage_path('app/public/' . $approval->approver->signature_path);
+                                        if(file_exists($signaturePath)) {
+                                            $imageData = base64_encode(file_get_contents($signaturePath));
+                                            $imageMime = mime_content_type($signaturePath);
+                                            $base64Image = 'data:' . $imageMime . ';base64,' . $imageData;
+                                        } else {
+                                            $base64Image = null;
+                                        }
+                                    @endphp
+                                    @if(isset($base64Image) && $base64Image)
+                                        <img src="{{ $base64Image }}" alt="Signature" class="signature-img">
+                                    @endif
+                                @endif
+                            </div>
+                            <div class="signature-name">{{ $approval->approver->name }}</div>
+                            <div class="signature-position">{{ $approval->approver->position }}</div>
+                            <div class="signature-date">{{ $approval->approved_at->format('d/m/Y') }}</div>
+                        </div>
+                    </td>
+                @endforeach
+                </tr>
+            </table>
         </div>
     </div>
+
+    <!-- Page Break for Reference Links -->
+    @php
+        $itemsWithLink = $pr->items->filter(fn($item) => !empty($item->url_link));
+    @endphp
+
+    @if($itemsWithLink->isNotEmpty())
+        <div style="page-break-before: always;"></div>
+        
+        <div class="header">
+            <div class="header-center">
+                <h1>REFERENSI HARGA / LINK PRODUK</h1>
+                <div style="font-size: 10pt;">Lampiran PR No: {{ $pr->pr_number }}</div>
+            </div>
+        </div>
+
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th class="no-col">No</th>
+                    <th class="name-col" style="width: 30%;">Nama Barang</th>
+                    <th class="qty-col" style="width: 10%;">Qty</th>
+                    <th class="price-col" style="width: 15%;">Harga Satuan</th>
+                    <th style="width: 40%;">Link / URL Referensi</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($itemsWithLink as $index => $item)
+                <tr>
+                    <td class="text-center">{{ $loop->iteration }}</td>
+                    <td>{{ $item->item_name }}</td>
+                    <td class="text-center">{{ $item->quantity }} {{ $item->unit }}</td>
+                    <td class="text-right">Rp {{ number_format($item->price_estimation, 0, ',', '.') }}</td>
+                    <td style="word-break: break-all; color: blue;">
+                        <a href="{{ $item->url_link }}" target="_blank" style="text-decoration: none; color: blue;">{{ $item->url_link }}</a>
+                    </td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @endif
+
+    @php
+        $lastHoApproval = $hoApprovals->sortByDesc('level')->first();
+    @endphp
+
+    @if($lastHoApproval)
+    <div class="footer-approved">
+        Approved : {{ $lastHoApproval->approved_at->format('d/m/Y') }}
+    </div>
+    @endif
+
 </body>
 </html>

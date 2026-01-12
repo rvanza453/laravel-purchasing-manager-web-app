@@ -14,7 +14,8 @@
             }
         }
         
-        $isHO = auth()->user()->hasRole('admin'); 
+        // Define HO as Admin OR Global Approver
+        $isHO = auth()->user()->hasRole('admin') || \App\Models\GlobalApproverConfig::where('user_id', auth()->id())->exists(); 
     @endphp
 
     <div class="max-w-4xl mx-auto space-y-6">
@@ -103,6 +104,7 @@
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kode Barang</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Barang</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty Original</th>
                         @if($canApprove && $isHO)
@@ -113,11 +115,15 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Satuan</th>
                         <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Estimasi</th>
                         <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Link</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     @foreach($pr->items as $item)
                         <tr>
+                            <td class="px-6 py-4 text-sm text-gray-500">
+                                {{ $item->product->code ?? '-' }}
+                            </td>
                             <td class="px-6 py-4 text-sm text-gray-900">
                                 <div class="font-medium">{{ $item->item_name }}</div>
                                 @if($item->specification)
@@ -158,6 +164,16 @@
                             <td class="px-6 py-4 text-sm text-gray-500">{{ $item->unit }}</td>
                             <td class="px-6 py-4 text-sm text-gray-900 text-right">Rp {{ number_format($item->price_estimation, 0, ',', '.') }}</td>
                             <td class="px-6 py-4 text-sm font-medium text-gray-900 text-right">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</td>
+                            <td class="px-6 py-4 text-sm">
+                                @if($item->url_link)
+                                    <a href="{{ $item->url_link }}" target="_blank" class="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded border border-blue-200 hover:bg-blue-100 transition-colors" title="Buka Link Referensi">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                                        Cek Link
+                                    </a>
+                                @else
+                                    <span class="text-xs text-gray-400">-</span>
+                                @endif
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>

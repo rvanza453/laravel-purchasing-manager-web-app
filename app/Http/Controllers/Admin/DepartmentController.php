@@ -14,7 +14,12 @@ class DepartmentController extends Controller
 {
     public function index()
     {
-        $departments = Department::with(['site', 'approverConfigs.user'])->get();
+        $departments = Department::with(['site', 'approverConfigs.user'])
+                        ->orderBy('name')
+                        ->get()
+                        ->groupBy(function($dept) {
+                            return $dept->site->name ?? 'No Site';
+                        });
         $globalApprovers = \App\Models\GlobalApproverConfig::with('user')->orderBy('level')->get();
         return view('admin.departments.index', compact('departments', 'globalApprovers'));
     }
@@ -32,10 +37,8 @@ class DepartmentController extends Controller
     public function edit(Department $department)
     {
         $sites = Site::all();
-        $users = User::where('department_id', $department->id)->orWhere('site_id', $department->site_id)->get(); 
-        if ($users->isEmpty()) {
-             $users = User::all(); 
-        }
+        // Filter users strictly by the same site as the department
+        $users = User::where('site_id', $department->site_id)->orderBy('name')->get();
         
         // No need to load subDepartments here anymore
 
@@ -74,5 +77,10 @@ class DepartmentController extends Controller
     public function destroy(Department $department)
     {
         return redirect()->route('master-departments.index')->with('error', 'Please use Department Management to delete departments.');
+    }
+
+    public function getDepartmentsBySite(Site $site)
+    {
+        return response()->json($site->departments()->select('id', 'name')->orderBy('name')->get());
     }
 }

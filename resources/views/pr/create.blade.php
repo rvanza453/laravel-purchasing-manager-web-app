@@ -50,8 +50,8 @@
                     const subDeptSelect = document.getElementById('sub_department_id');
                     const departmentsData = @json($departments);
 
-                    deptSelect.addEventListener('change', function() {
-                        const deptId = this.value;
+                    function updateSubDepartments() {
+                        const deptId = deptSelect.value;
                         subDeptSelect.innerHTML = '<option value="">Pilih Sub Departemen</option>';
                         
                         if (deptId) {
@@ -69,7 +69,24 @@
                             subDeptSelect.disabled = true;
                             subDeptSelect.innerHTML = '<option value="">Pilih Departemen Terlebih Dahulu</option>';
                         }
-                    });
+                    }
+
+                    deptSelect.addEventListener('change', updateSubDepartments);
+
+                    // Auto-trigger if only one department is available (e.g. for non-admins)
+                    if (deptSelect.options.length === 2 && deptSelect.options[1].value) {
+                         deptSelect.selectedIndex = 1;
+                         updateSubDepartments();
+                         
+                         // Determine if we should make it read-only visually (for non-admins)
+                         // But we still need to submit the value.
+                         // For better UX, if filtered from backend, just let it be selected.
+                         // But if user requested "no choice", we can hide the select or disable it?
+                         @if(!auth()->user()->hasRole('admin'))
+                            // deptSelect.style.pointerEvents = 'none'; // Optional: lock it
+                            // deptSelect.classList.add('bg-gray-100');
+                         @endif
+                    }
                 </script>
 
                 {{-- Date --}}
@@ -147,6 +164,9 @@
                             <select name="items[${currentIndex}][manual_category]" class="block w-full border-gray-300 rounded-md shadow-sm text-sm p-1.5 focus:border-primary-500 focus:ring-primary-500">
                                 ${categoryOptions}
                             </select>
+                            
+                            {{-- URL Link Input --}}
+                            <input type="url" name="items[${currentIndex}][url_link]" placeholder="Link / URL Referensi (Opsional)" class="block w-full border-gray-300 rounded-md shadow-sm text-sm p-1.5 focus:border-primary-500 focus:ring-primary-500">
                         </div>
                         <input type="hidden" name="items[${currentIndex}][is_manual]" id="is-manual-${currentIndex}" value="0">
                     </div>

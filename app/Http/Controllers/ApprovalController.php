@@ -37,17 +37,27 @@ class ApprovalController extends Controller
             abort(403);
         }
 
-        // Validate adjusted quantities if provided (optional for HO approvers)
+        // Check if user is an HO Approver (Global Approver) or Admin
+        $isHO = auth()->user()->hasRole('admin') || \App\Models\GlobalApproverConfig::where('user_id', auth()->id())->exists();
+
+        // Validate adjusted quantities if provided (only for HO approvers)
         $validated = $request->validate([
             'remarks' => 'nullable|string',
             'adjusted_quantities' => 'nullable|array',
             'adjusted_quantities.*' => 'nullable|numeric|min:0',
         ]);
 
+        $adjustedQuantities = $request->input('adjusted_quantities');
+        
+        // If not HO, ignore adjusted quantities to prevent unauthorized changes
+        if (!$isHO) {
+            $adjustedQuantities = null;
+        }
+
         $this->approvalService->approve(
             $approval, 
             $request->input('remarks'),
-            $request->input('adjusted_quantities')
+            $adjustedQuantities
         );
 
         return redirect()->route('approval.index')->with('success', 'PR Approved successfully.');

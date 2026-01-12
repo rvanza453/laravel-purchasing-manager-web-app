@@ -96,3 +96,29 @@
         </div>
     </div>
 </x-app-layout>
+
+<script>
+    document.getElementById('site_id').addEventListener('change', function() {
+        const siteId = this.value;
+        const deptSelect = document.getElementById('department_id');
+        
+        // Reset dropdown
+        deptSelect.innerHTML = '<option value="">Pilih Departemen (Opsional)</option>';
+        deptSelect.disabled = true;
+        
+        if (siteId) {
+            deptSelect.disabled = false;
+            fetch(`/api/sites/${siteId}/departments`)
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach(dept => {
+                        deptSelect.innerHTML += `<option value="${dept.id}">${dept.name}</option>`;
+                    });
+                })
+                .catch(error => console.error('Error fetching departments:', error));
+        }
+    });
+
+    // Ensure dropdown state on load (if site is selected but dept is not?) 
+    // Actually, for Edit, blade handles the initial state correctly.
+</script>

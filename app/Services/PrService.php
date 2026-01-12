@@ -18,11 +18,30 @@ class PrService
     {
         return DB::transaction(function () use ($data, $items) {
             // 1. Generate PR Number
-            $dept = Department::find($data['department_id']);
+            $dept = Department::with('site')->find($data['department_id']);
             $year = date('Y');
-            $month = date('m');
-            $count = PurchaseRequest::whereYear('created_at', $year)->count() + 1;
-            $prNumber = sprintf("PR/%s/%s/%s/%04d", $dept->code, $year, $month, $count);
+            $month = date('n'); // Numeric representation of a month, without leading zeros
+            
+            $lastPr = PurchaseRequest::whereYear('created_at', $year)->orderBy('id', 'desc')->first();
+            
+            $count = 1;
+            if ($lastPr) {
+                if (str_starts_with($lastPr->pr_number, 'PR/')) {
+                    // Old Format: PR/CODE/YEAR/MONTH/XXXX
+                    $lastNumber = intval(substr($lastPr->pr_number, -4));
+                } else {
+                    // New Format: XXXX/CODE/ROMAN/YEAR
+                    $parts = explode('/', $lastPr->pr_number);
+                    $lastNumber = intval($parts[0]);
+                }
+                $count = $lastNumber + 1;
+            }
+
+            $romanMonth = $this->getRomanMonth($month);
+            $siteName = $dept->site->name ?? 'HO';
+            $deptSiteCode = $dept->code . '-' . $siteName;
+            
+            $prNumber = sprintf("%04d/%s/%s/%s", $count, $deptSiteCode, $romanMonth, $year);
 
             // 2. Create PR Record
             $pr = PurchaseRequest::create([
@@ -61,6 +80,7 @@ class PrService
                     'price_estimation' => $item['price_estimation'],
                     'subtotal' => $subtotal,
                     'manual_category' => $item['manual_category'] ?? null,
+                    'url_link' => $item['url_link'] ?? null, // Save URL link
                 ]);
                 $totalCost += $subtotal;
             }
@@ -111,5 +131,14 @@ class PrService
                 ]);
             }
         }
+    }
+
+    private function getRomanMonth($month)
+    {
+        $map = [
+            1 => 'I', 2 => 'II', 3 => 'III', 4 => 'IV', 5 => 'V', 6 => 'VI',
+            7 => 'VII', 8 => 'VIII', 9 => 'IX', 10 => 'X', 11 => 'XI', 12 => 'XII'
+        ];
+        return $map[$month] ?? 'I';
     }
 }

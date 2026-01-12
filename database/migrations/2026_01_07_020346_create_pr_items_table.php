@@ -11,10 +11,10 @@ return new class extends Migration
         Schema::create('pr_items', function (Blueprint $table) {
             $table->id();
             $table->foreignId('purchase_request_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('product_id')->nullable()->constrained(); // Master Product
-            $table->string('item_name')->nullable(); // Fallback if adhoc item, or product name snapshot
+            $table->foreignId('product_id')->nullable()->constrained(); 
+            $table->string('item_name')->nullable(); 
             $table->integer('quantity');
-            $table->string('unit')->nullable(); // Snapshot
+            $table->string('unit')->nullable(); 
             $table->decimal('price_estimation', 15, 2)->default(0);
             $table->decimal('subtotal', 15, 2)->default(0);
             $table->timestamps();
