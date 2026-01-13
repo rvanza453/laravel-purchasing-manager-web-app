@@ -120,6 +120,11 @@
                         </form>
                     </div>
                 </nav>
+                <div class="mt-auto px-6 py-4 border-t border-gray-100">
+                    <div class="text-xs text-gray-400">
+                        &copy; {{ date('Y') }} revanza
+                    </div>
+                </div>
             </aside>
 
             <!-- Page Content -->
