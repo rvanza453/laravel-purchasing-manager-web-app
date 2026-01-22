@@ -40,7 +40,7 @@
             <div class="absolute -bottom-8 left-20 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
             <div class="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
 
-            <div class="relative z-10 w-full sm:max-w-md mt-6 px-8 py-8 bg-white/90 backdrop-blur-xl shadow-2xl overflow-hidden sm:rounded-2xl border border-white/20 ring-1 ring-black/5">
+            <div class="relative z-10 w-full sm:max-w-md mt-6 px-8 pt-8 bg-white/90 backdrop-blur-xl shadow-2xl sm:rounded-[0.5rem] border border-white/20 ring-1 ring-black/5" style="padding-bottom: 4rem; border-radius: 2.5rem;">
                 <div class="flex justify-center mb-8">
                     <a href="/">
                         <x-application-logo class="w-48 h-auto drop-shadow-xl" />

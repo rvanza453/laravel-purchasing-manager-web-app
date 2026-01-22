@@ -14,9 +14,14 @@ class Department extends Model
     protected $fillable = [
         'site_id',
         'name',
-        'code',
+        'coa',
         'budget',
-        'use_global_approval'
+        'use_global_approval',
+        'budget_type'
+    ];
+
+    protected $casts = [
+        'budget_type' => \App\Enums\BudgetingType::class,
     ];
 
     public function site(): BelongsTo

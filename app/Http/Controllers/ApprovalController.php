@@ -17,9 +17,11 @@ class ApprovalController extends Controller
 
     public function index()
     {
-        // Admin can see all pending approvals, regular users see only their assigned approvals
-        $query = PrApproval::where('status', 'Pending')
-            ->with(['purchaseRequest.user', 'purchaseRequest.department', 'purchaseRequest.items']);
+        // Admin can see all pending/on-hold approvals
+        // Regular users see only their assigned approvals which are "Current Turn"
+        
+        $query = PrApproval::whereIn('status', ['Pending', 'On Hold'])
+            ->with(['purchaseRequest.user', 'purchaseRequest.department', 'purchaseRequest.items.job', 'purchaseRequest.approvals']);
         
         if (!auth()->user()->hasRole('admin')) {
             $query->where('approver_id', auth()->id());
@@ -27,11 +29,54 @@ class ApprovalController extends Controller
         
         $approvals = $query->orderBy('created_at', 'asc')->get();
 
-        return view('approval.index', compact('approvals'));
+        // Filter: Only show if this is the LOWEST Pending/OnHold level for the PR
+        // If Admin, maybe show all? The user request implies strict order.
+        // Let's enforce strict order even for what "Inbox" shows, but Admin might have a separate view usually.
+        // Assuming strict compliance:
+        
+        $filtered = $approvals->filter(function ($approval) {
+            // If the PR is globally rejected or cancelled, don't show (though status check above might cover IDK)
+            // But individual approval is Pending/OnHold.
+            
+            // Get all approvals for this PR that are not approved/rejected yet
+            // actually we just need to see if there is any level < this level that is NOT Approved
+            
+            $previousLevelsNotApproved = $approval->purchaseRequest->approvals
+                ->filter(function ($other) use ($approval) {
+                    return $other->level < $approval->level && $other->status !== \App\Enums\PrStatus::APPROVED->value;
+                });
+
+            return $previousLevelsNotApproved->isEmpty();
+        });
+
+        return view('approval.index', ['approvals' => $filtered]);
+    }
+
+    private function enforceSequentialApproval(PrApproval $approval)
+    {
+        // Allow Admin to bypass sequential enforcement
+        if (auth()->user()->hasRole('admin')) {
+            return;
+        }
+        
+        // User requested strict order: "jika dari atas belum approve, maka tidak akan muncul dibawahnya"
+        // However, if THIS approval is On Hold, the approver should be able to approve/reject it
+        // So we check for LOWER levels that are not Approved AND not the current approval
+        
+        $hasPendingLowerLevel = PrApproval::where('purchase_request_id', $approval->purchase_request_id)
+            ->where('level', '<', $approval->level)
+            ->whereNotIn('status', [\App\Enums\PrStatus::APPROVED->value])
+            ->exists();
+
+        if ($hasPendingLowerLevel) {
+            abort(403, 'Previous approval levels must be completed first.');
+        }
     }
 
     public function approve(Request $request, PrApproval $approval)
     {
+        $this->enforceSequentialApproval($approval);
+
         // Ensure user owns this approval OR is Admin
         if ($approval->approver_id !== auth()->id() && !auth()->user()->hasRole('admin')) {
             abort(403);
@@ -63,8 +108,26 @@ class ApprovalController extends Controller
         return redirect()->route('approval.index')->with('success', 'PR Approved successfully.');
     }
 
+    public function hold(Request $request, PrApproval $approval)
+    {
+        $this->enforceSequentialApproval($approval);
+
+        // Ensure user owns this approval OR is Admin
+        if ($approval->approver_id !== auth()->id() && !auth()->user()->hasRole('admin')) {
+            abort(403);
+        }
+
+        $request->validate(['remarks' => 'required|string']);
+
+        $this->approvalService->hold($approval, $request->input('remarks'));
+
+        return redirect()->route('approval.index')->with('success', 'PR placed On Hold.');
+    }
+
     public function reject(Request $request, PrApproval $approval)
     {
+        $this->enforceSequentialApproval($approval);
+
         if ($approval->approver_id !== auth()->id() && !auth()->user()->hasRole('admin')) {
             abort(403);
         }

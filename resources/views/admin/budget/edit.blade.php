@@ -15,27 +15,53 @@
                         @method('PUT')
 
                         <div class="mb-6">
-                            <h3 class="text-lg font-medium text-gray-900 mb-4">Budget Limits per Category (Year {{ date('Y') }})</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                @foreach ($categories as $category)
-                                    <div>
-                                        <x-input-label :for="'budget_'.$category" :value="$category" />
-                                        <div class="mt-1 relative rounded-md shadow-sm">
-                                            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                                <span class="text-gray-500 sm:text-sm">Rp</span>
+                            @if(isset($isJobCoa) && $isJobCoa)
+                                <h3 class="text-lg font-medium text-gray-900 mb-4">Budget Limits per Job (Year {{ date('Y') }})</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    @foreach ($jobs as $job)
+                                        <div>
+                                            <div class="flex justify-between items-end mb-1">
+                                                <x-input-label :for="'budget_'.$job->id" :value="$job->code . ' - ' . $job->name" />
                                             </div>
-                                            <input type="number" 
-                                                   name="budgets[{{ $category }}]" 
-                                                   id="budget_{{Str::slug($category)}}"
-                                                   class="block w-full rounded-md border-gray-300 pl-12 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                                                   placeholder="0"
-                                                   value="{{ old('budgets.'.$category, $existingBudgets[$category] ?? 0) }}"
-                                                   min="0"
-                                                   step="1000">
+                                            <div class="mt-1 relative rounded-md shadow-sm">
+                                                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                                    <span class="text-gray-500 sm:text-sm">Rp</span>
+                                                </div>
+                                                <input type="number" 
+                                                       name="budgets[{{ $job->id }}]" 
+                                                       id="budget_{{ $job->id }}"
+                                                       class="block w-full rounded-md border-gray-300 pl-12 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
+                                                       placeholder="0"
+                                                       value="{{ old('budgets.'.$job->id, $existingBudgets[$job->id] ?? 0) }}"
+                                                       min="0"
+                                                       step="1000">
+                                            </div>
                                         </div>
-                                    </div>
-                                @endforeach
-                            </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <h3 class="text-lg font-medium text-gray-900 mb-4">Budget Limits per Category (Year {{ date('Y') }})</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    @foreach ($categories as $category)
+                                        <div>
+                                            <x-input-label :for="'budget_'.$category" :value="$category" />
+                                            <div class="mt-1 relative rounded-md shadow-sm">
+                                                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                                    <span class="text-gray-500 sm:text-sm">Rp</span>
+                                                </div>
+                                                <input type="number" 
+                                                       name="budgets[{{ $category }}]" 
+                                                       id="budget_{{Str::slug($category)}}"
+                                                       class="block w-full rounded-md border-gray-300 pl-12 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
+                                                       placeholder="0"
+                                                       value="{{ old('budgets.'.$category, $existingBudgets[$category] ?? 0) }}"
+                                                       min="0"
+                                                       step="1000">
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
                         </div>
 
                         <div class="flex items-center gap-4 border-t pt-4">

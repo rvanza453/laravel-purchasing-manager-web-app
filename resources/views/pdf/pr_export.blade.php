@@ -303,7 +303,7 @@
                 </tr>
                 <tr>
                     <td class="label">Jenis/Pekerjaan/Unit/Stadium/Kategori</td>
-                    <td class="value">: {{ ($pr->department->name ?? '-') . ' / ' . ($pr->subDepartment->name ?? '-') }}</td>
+                    <td class="value">: {{ $jobName }}</td>
                 </tr>
                 <tr>
                     <td class="label">No. PP</td>
@@ -411,19 +411,13 @@
                 <td class="text-right">{{ number_format($pengajuanPrice, 0, ',', '.') }}</td>
                 <td class="text-center">{{ $finalQty }}</td>
                 <td class="text-right">{{ number_format($totalPrice, 0, ',', '.') }}</td>
-                <td>-</td>
+                <td>{{ $item->remarks ?? '-' }}</td>
             </tr>
             @endforeach
             
-            <tr class="total-row">
-                <td colspan="{{ 10 + count($hoApprovals) }}" class="text-right">Total Anggaran: Rp {{ number_format($budgetInfo['total'], 0, ',', '.') }}</td>
-                <td colspan="2"></td>
-            </tr>
             <tr>
-                <td colspan="{{ 10 + count($hoApprovals) }}" class="text-right" style="font-size: 7pt;">
-                    Actual: Rp {{ number_format($budgetInfo['actual'], 0, ',', '.') }} | 
-                    Permintaan: Rp {{ number_format($budgetInfo['current'], 0, ',', '.') }} | 
-                    Saldo: Rp {{ number_format($budgetInfo['saldo'], 0, ',', '.') }}
+                <td colspan="{{ (10) + count($hoApprovals) }}" class="text-right" style="font-weight: bold;">
+                    Total Harga yang disetujui : Rp {{ number_format($totalPrice, 0, ',', '.') }}
                 </td>
                 <td colspan="2"></td>
             </tr>

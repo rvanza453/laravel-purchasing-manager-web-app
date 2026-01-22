@@ -57,4 +57,16 @@ class PurchaseRequest extends Model
     {
         return $this->hasOne(PurchaseOrder::class);
     }
+
+    public function getFinalTotalAttribute()
+    {
+        if ($this->status !== 'Approved') {
+            return $this->total_estimated_cost;
+        }
+
+        // Calculate sum of items with final approved quantities
+        return $this->items->sum(function ($item) {
+            return $item->getFinalQuantity() * $item->price_estimation;
+        });
+    }
 }

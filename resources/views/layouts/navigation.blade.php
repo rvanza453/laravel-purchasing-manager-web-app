@@ -102,6 +102,11 @@
                 {{ __('Sub Depts') }}
             </x-responsive-nav-link>
 
+
+            <x-responsive-nav-link :href="route('jobs.index')" :active="request()->routeIs('jobs.*')">
+                {{ __('Pekerjaan') }}
+            </x-responsive-nav-link>
+
             <x-responsive-nav-link :href="route('admin.budgets.index')" :active="request()->routeIs('admin.budgets.*')">
                 {{ __('Budget') }}
             </x-responsive-nav-link>

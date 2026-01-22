@@ -33,9 +33,9 @@
                         </div>
 
                         <div>
-                            <x-input-label for="code" :value="__('Code (Optional)')" />
-                            <x-text-input id="code" class="block mt-1 w-full" type="text" name="code" :value="old('code', $subDepartment->code)" />
-                            <x-input-error :messages="$errors->get('code')" class="mt-2" />
+                            <x-input-label for="coa" :value="__('COA (Optional)')" />
+                            <x-text-input id="coa" class="block mt-1 w-full" type="text" name="coa" :value="old('coa', $subDepartment->coa)" />
+                            <x-input-error :messages="$errors->get('coa')" class="mt-2" />
                         </div>
 
                         <div class="flex items-center gap-4">

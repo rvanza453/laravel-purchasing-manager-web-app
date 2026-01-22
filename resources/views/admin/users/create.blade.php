@@ -49,9 +49,9 @@
 
                 <!-- Department -->
                 <div>
-                    <x-input-label for="department_id" :value="__('Departemen')" />
+                    <x-input-label for="department_id" :value="__('Unit')" />
                     <select id="department_id" name="department_id" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
-                        <option value="">Pilih Departemen (Opsional)</option>
+                        <option value="">Pilih Unit (Opsional)</option>
                         @foreach($departments as $dept)
                             <option value="{{ $dept->id }}" {{ old('department_id') == $dept->id ? 'selected' : '' }}>{{ $dept->name }}</option>
                         @endforeach
@@ -97,7 +97,7 @@
         const deptSelect = document.getElementById('department_id');
         
         // Reset dropdown
-        deptSelect.innerHTML = '<option value="">Pilih Departemen (Opsional)</option>';
+        deptSelect.innerHTML = '<option value="">Pilih Unit (Opsional)</option>';
         
         if (siteId) {
             fetch(`/api/sites/${siteId}/departments`)

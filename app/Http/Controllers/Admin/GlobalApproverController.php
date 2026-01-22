@@ -13,7 +13,10 @@ class GlobalApproverController extends Controller
     public function index()
     {
         $approvers = \App\Models\GlobalApproverConfig::with('user')->orderBy('level')->get();
-        $users = \App\Models\User::orderBy('name')->get();
+        // Only show users from HO site
+        $users = \App\Models\User::whereHas('site', function($q) {
+            $q->where('code', 'HO');
+        })->orderBy('name')->get();
         return view('admin.global_approvers.index', compact('approvers', 'users'));
     }
 

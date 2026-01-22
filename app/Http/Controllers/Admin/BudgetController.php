@@ -18,8 +18,14 @@ class BudgetController extends Controller
         if ($department_id) {
             $department = \App\Models\Department::with('site')->findOrFail($department_id);
             $subDepartments = SubDepartment::where('department_id', $department_id)
-                ->with(['budgets' => function($q) use ($year) {
+                ->with(['budgets' => function($q) use ($year, $department) {
                     $q->where('year', $year);
+                    // Filter by budget type
+                    if ($department->budget_type === \App\Enums\BudgetingType::JOB_COA) {
+                        $q->whereNotNull('job_id');
+                    } else {
+                        $q->whereNotNull('category');
+                    }
                 }])
                 ->get();
             return view('admin.budget.index', compact('subDepartments', 'department', 'year'));
@@ -56,13 +62,43 @@ class BudgetController extends Controller
 
     public function edit(SubDepartment $subDepartment)
     {
-        $subDepartment->load('budgets');
-        $categories = config('options.product_categories');
+        $subDepartment->load(['budgets', 'department']);
+        $isJobCoa = $subDepartment->department->budget_type === \App\Enums\BudgetingType::JOB_COA;
         
-        // Map existing budgets for easy access in view
-        $existingBudgets = $subDepartment->budgets->pluck('amount', 'category')->toArray();
+        $year = date('Y');
+        
+        // Clean up incompatible budgets (e.g., category budgets when type is job_coa)
+        if ($isJobCoa) {
+            // Delete category-based budgets for this sub-department
+            Budget::where('sub_department_id', $subDepartment->id)
+                ->where('year', $year)
+                ->whereNotNull('category')
+                ->delete();
+        } else {
+            // Delete job-based budgets for this sub-department
+            Budget::where('sub_department_id', $subDepartment->id)
+                ->where('year', $year)
+                ->whereNotNull('job_id')
+                ->delete();
+        }
+        
+        // Reload budgets after cleanup
+        $subDepartment->load('budgets');
+        
+        $categories = config('options.product_categories');
+        $jobs = [];
 
-        return view('admin.budget.edit', compact('subDepartment', 'categories', 'existingBudgets'));
+        if ($isJobCoa) {
+            // Fetch all Global Jobs
+            $jobs = \App\Models\Job::orderBy('code')->get();
+            // Map existing budgets by job_id
+            $existingBudgets = $subDepartment->budgets->pluck('amount', 'job_id')->toArray();
+        } else {
+            // Map existing budgets by category
+            $existingBudgets = $subDepartment->budgets->pluck('amount', 'category')->toArray();
+        }
+
+        return view('admin.budget.edit', compact('subDepartment', 'categories', 'existingBudgets', 'isJobCoa', 'jobs'));
     }
 
     public function update(Request $request, SubDepartment $subDepartment)
@@ -73,18 +109,49 @@ class BudgetController extends Controller
         ]);
 
         $year = date('Y');
+        $subDepartment->load('department');
+        $isJobCoa = $subDepartment->department->budget_type === \App\Enums\BudgetingType::JOB_COA;
 
-        foreach ($request->budgets as $category => $amount) {
-            Budget::updateOrCreate(
-                [
-                    'sub_department_id' => $subDepartment->id,
-                    'category' => $category,
-                    'year' => $year
-                ],
-                [
-                    'amount' => $amount ?? 0
-                ]
-            );
+        if ($isJobCoa) {
+            // Key is Job ID
+            // First, delete all existing job budgets for this sub-department and year
+            Budget::where('sub_department_id', $subDepartment->id)
+                ->where('year', $year)
+                ->whereNotNull('job_id')
+                ->delete();
+            
+            // Then create new budgets only for jobs with non-zero amounts
+            foreach ($request->budgets as $jobId => $amount) {
+                if ($amount > 0) {
+                    Budget::create([
+                        'sub_department_id' => $subDepartment->id,
+                        'job_id' => $jobId,
+                        'year' => $year,
+                        'amount' => $amount,
+                        'category' => null
+                    ]);
+                }
+            }
+        } else {
+            // Key is Category Name
+            // First, delete all existing category budgets for this sub-department and year
+            Budget::where('sub_department_id', $subDepartment->id)
+                ->where('year', $year)
+                ->whereNotNull('category')
+                ->delete();
+            
+            // Then create new budgets only for categories with non-zero amounts
+            foreach ($request->budgets as $category => $amount) {
+                if ($amount > 0) {
+                    Budget::create([
+                        'sub_department_id' => $subDepartment->id,
+                        'category' => $category,
+                        'year' => $year,
+                        'amount' => $amount,
+                        'job_id' => null
+                    ]);
+                }
+            }
         }
 
         return redirect()->route('admin.budgets.index')

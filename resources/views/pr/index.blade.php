@@ -15,51 +15,86 @@
         <!-- Filters -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
             <form method="GET" action="{{ route('pr.index') }}">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <!-- Search -->
-                    <div class="col-span-1 md:col-span-1">
-                        <label for="search" class="block text-xs font-medium text-gray-700 mb-1">Cari (No. PR / Keterangan)</label>
-                        <div class="relative">
-                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <div class="space-y-4">
+                    <!-- Row 1 -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <!-- Search -->
+                        <div class="col-span-1 md:col-span-1">
+                            <label for="search" class="block text-xs font-medium text-gray-700 mb-1">Cari (No. PR / Keterangan)</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                </div>
+                                <input type="text" name="search" id="search" value="{{ request('search') }}" 
+                                    class="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" 
+                                    placeholder="Cari...">
                             </div>
-                            <input type="text" name="search" id="search" value="{{ request('search') }}" 
-                                class="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" 
-                                placeholder="Cari...">
                         </div>
-                    </div>
 
-                    <!-- Status -->
-                    <div>
-                        <label for="status" class="block text-xs font-medium text-gray-700 mb-1">Status</label>
-                        <select name="status" id="status" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
-                            <option value="">Semua Status</option>
-                            @foreach(['Pending', 'Approved', 'Rejected', 'PO Created'] as $stat)
-                                <option value="{{ $stat }}" {{ request('status') == $stat ? 'selected' : '' }}>{{ $stat }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <!-- Date Range -->
-                    <div class="grid grid-cols-2 gap-2">
+                        <!-- Status -->
                         <div>
-                            <label for="start_date" class="block text-xs font-medium text-gray-700 mb-1">Mulai Tanggal</label>
-                            <input type="date" name="start_date" id="start_date" value="{{ request('start_date') }}" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
+                            <label for="status" class="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                            <select name="status" id="status" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
+                                <option value="">Semua Status</option>
+                                @foreach(['Pending', 'On Hold', 'Approved', 'Rejected', 'PO Created'] as $stat)
+                                    <option value="{{ $stat }}" {{ request('status') == $stat ? 'selected' : '' }}>{{ $stat }}</option>
+                                @endforeach
+                            </select>
                         </div>
+                        
+                        <!-- Department -->
                         <div>
-                            <label for="end_date" class="block text-xs font-medium text-gray-700 mb-1">Sampai Tanggal</label>
-                            <input type="date" name="end_date" id="end_date" value="{{ request('end_date') }}" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
+                            <label for="department_id" class="block text-xs font-medium text-gray-700 mb-1">Unit</label>
+                            <select name="department_id" id="department_id" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" onchange="this.form.submit()">
+                                <option value="">Semua Unit</option>
+                                @foreach($departments as $dept)
+                                    <option value="{{ $dept->id }}" {{ request('department_id') == $dept->id ? 'selected' : '' }}>{{ $dept->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <!-- Sub Department -->
+                        <div>
+                            <label for="sub_department_id" class="block text-xs font-medium text-gray-700 mb-1">Stasiun / Afdeling</label>
+                            <select name="sub_department_id" id="sub_department_id" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
+                                <option value="">Semua Sub Dept</option>
+                                @foreach($departments as $dept)
+                                    @if(request('department_id') && request('department_id') != $dept->id)
+                                        @continue
+                                    @endif
+                                    <optgroup label="{{ $dept->name }}">
+                                        @foreach($dept->subDepartments as $sub)
+                                            <option value="{{ $sub->id }}" {{ request('sub_department_id') == $sub->id ? 'selected' : '' }}>{{ $sub->name }}</option>
+                                        @endforeach
+                                    </optgroup>
+                                @endforeach
+                            </select>
                         </div>
                     </div>
 
-                    <!-- Actions -->
-                    <div class="flex items-end gap-2">
-                        <button type="submit" class="px-4 py-2 bg-gray-800 text-white rounded-md text-sm font-medium hover:bg-gray-700 w-full shadow-sm">
-                            Filter
-                        </button>
-                        <a href="{{ route('pr.index') }}" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50 text-center w-full shadow-sm">
-                            Reset
-                        </a>
+                    <!-- Row 2 -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <!-- Date Range -->
+                        <div class="md:col-span-2 grid grid-cols-2 gap-2">
+                            <div>
+                                <label for="start_date" class="block text-xs font-medium text-gray-700 mb-1">Mulai Tanggal</label>
+                                <input type="date" name="start_date" id="start_date" value="{{ request('start_date') }}" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label for="end_date" class="block text-xs font-medium text-gray-700 mb-1">Sampai Tanggal</label>
+                                <input type="date" name="end_date" id="end_date" value="{{ request('end_date') }}" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="md:col-start-4 flex items-end gap-2">
+                            <button type="submit" class="px-4 py-2 bg-gray-800 text-white rounded-md text-sm font-medium hover:bg-gray-700 w-full shadow-sm">
+                                Filter
+                            </button>
+                            <a href="{{ route('pr.index') }}" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50 text-center w-full shadow-sm">
+                                Reset
+                            </a>
+                        </div>
                     </div>
                 </div>
             </form>
@@ -72,9 +107,8 @@
                     <thead class="bg-gray-50 border-b border-gray-200">
                         <tr>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">No. PR / Tanggal</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Departemen</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Keterangan</th>
-                            <th scope="col" class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Total Estimasi</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Unit</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Total Harga</th>
                             <th scope="col" class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
                             <th scope="col" class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Aksi</th>
                         </tr>
@@ -89,14 +123,21 @@
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                                     {{ $pr->department->name ?? '-' }}
                                     @if($pr->subDepartment)
-                                        <div class="text-xs text-gray-400">({{ $pr->subDepartment->name }})</div>
+                                        <div class="text-xs text-gray-400">
+                                            ({{ $pr->subDepartment->coa ? $pr->subDepartment->coa . ' - ' : '' }}{{ $pr->subDepartment->name }})
+                                        </div>
+                                    @endif
+                                    @php    
+                                        $job = $pr->items->first()->job ?? null;
+                                    @endphp
+                                    @if($job)
+                                        <div class="text-xs text-gray-500 mt-1">
+                                            <span class="font-medium">Job:</span> {{ $job->code ? $job->code . ' - ' : '' }}{{ $job->name }}
+                                        </div>
                                     @endif
                                 </td>
-                                <td class="px-6 py-4 text-sm text-gray-600 truncate max-w-xs" title="{{ $pr->description }}">
-                                    {{ Str::limit($pr->description, 50) }}
-                                </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium">
-                                    Rp {{ number_format($pr->total_estimated_cost, 0, ',', '.') }}
+                                    Rp {{ number_format($pr->final_total, 0, ',', '.') }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-center">
                                     @php

@@ -39,7 +39,7 @@ class PrService
 
             $romanMonth = $this->getRomanMonth($month);
             $siteName = $dept->site->name ?? 'HO';
-            $deptSiteCode = $dept->code . '-' . $siteName;
+            $deptSiteCode = $dept->coa . '-' . $siteName;
             
             $prNumber = sprintf("%04d/%s/%s/%s", $count, $deptSiteCode, $romanMonth, $year);
 
@@ -73,14 +73,16 @@ class PrService
 
                 $pr->items()->create([
                     'product_id' => $item['product_id'] ?? null,
+                    'job_id' => $item['job_id'] ?? null,
                     'item_name' => $productName,
                     'specification' => $item['specification'] ?? null,
+                    'remarks' => $item['remarks'] ?? null,
                     'quantity' => $item['quantity'],
                     'unit' => $unit,
                     'price_estimation' => $item['price_estimation'],
                     'subtotal' => $subtotal,
                     'manual_category' => $item['manual_category'] ?? null,
-                    'url_link' => $item['url_link'] ?? null, // Save URL link
+                    'url_link' => $item['url_link'] ?? null,
                 ]);
                 $totalCost += $subtotal;
             }

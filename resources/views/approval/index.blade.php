@@ -4,12 +4,21 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             @forelse($approvals as $approval)
-                <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden border-l-4 border-yellow-400">
+                @php
+                    $isHold = $approval->status === 'On Hold';
+                    $borderColor = $isHold ? 'border-orange-400' : 'border-yellow-400';
+                @endphp
+                <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden border-l-4 {{ $borderColor }}">
                     <div class="p-5">
                         <div class="flex justify-between items-start mb-5">
                             <div>
                                 <span class="text-xs font-semibold text-gray-400 uppercase">PR Number</span>
-                                <h3 class="text-lg font-bold text-gray-800">{{ $approval->purchaseRequest->pr_number }}</h3>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="text-lg font-bold text-gray-800">{{ $approval->purchaseRequest->pr_number }}</h3>
+                                    @if($isHold)
+                                        <span class="animate-pulse bg-orange-100 text-orange-700 text-[10px] px-2 py-0.5 rounded-full font-bold border border-orange-200 uppercase">On Hold</span>
+                                    @endif
+                                </div>
                                 <span class="text-[10px] text-gray-400 font-medium">Diajukan: {{ $approval->purchaseRequest->created_at->format('d M Y') }}</span>
                             </div>
                             <span class="bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs px-3 py-1.5 rounded-full font-bold shadow-sm">
@@ -37,7 +46,20 @@
                                 <div>
                                     <span class="text-xs text-gray-400 block">Pemohon</span>
                                     <span class="text-sm font-medium">{{ $approval->purchaseRequest->user->name }}</span>
-                                    <div class="text-xs text-gray-500">{{ $approval->purchaseRequest->department->name ?? '-' }}</div>
+                                    <div class="text-xs text-gray-500">
+                                        {{ $approval->purchaseRequest->department->name ?? '-' }}
+                                        @if($approval->purchaseRequest->subDepartment)
+                                            ({{ $approval->purchaseRequest->subDepartment->coa ? $approval->purchaseRequest->subDepartment->coa . ' - ' : '' }}{{ $approval->purchaseRequest->subDepartment->name }})
+                                        @endif
+                                    </div>
+                                    @php
+                                        $job = $approval->purchaseRequest->items->first()->job ?? null;
+                                    @endphp
+                                    @if($job)
+                                        <div class="text-xs text-gray-500 mt-1">
+                                            <span class="font-medium">Job:</span> {{ $job->code ? $job->code . ' - ' : '' }}{{ $job->name }}
+                                        </div>
+                                    @endif
                                 </div>
                                 <div>
                                     <span class="text-xs text-gray-400 block">Total Estimasi</span>

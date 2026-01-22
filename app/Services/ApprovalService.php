@@ -57,4 +57,20 @@ class ApprovalService
             return true;
         });
     }
+
+    public function hold(PrApproval $approval, string $remarks)
+    {
+        return DB::transaction(function () use ($approval, $remarks) {
+            $approval->update([
+                'status' => PrStatus::ON_HOLD->value,
+                'approved_at' => now(), // Time of action
+                'remarks' => $remarks
+            ]);
+
+            // Mark PR as On Hold (Global Status)
+            $approval->purchaseRequest->update(['status' => PrStatus::ON_HOLD->value]);
+
+            return true;
+        });
+    }
 }

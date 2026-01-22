@@ -32,6 +32,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('users', \App\Http\Controllers\Admin\UserController::class);
         Route::resource('global-approvers', \App\Http\Controllers\Admin\GlobalApproverController::class);
         Route::resource('products', \App\Http\Controllers\Admin\ProductController::class);
+        Route::resource('jobs', \App\Http\Controllers\Admin\JobController::class);
         
         // Budget Routes
         Route::get('/admin/budgets', [\App\Http\Controllers\Admin\BudgetController::class, 'index'])->name('admin.budgets.index');
@@ -43,12 +44,14 @@ Route::middleware('auth')->group(function () {
     Route::resource('pr', PrController::class);
     Route::get('/pr/{purchaseRequest}/export-pdf', [\App\Http\Controllers\PrPdfController::class, 'export'])->name('pr.export.pdf');
     Route::get('/api/budget/{subDepartment}', [PrController::class, 'getBudgetStatus'])->name('api.budget.status');
+    Route::get('/api/sub-department/{subDepartment}/jobs', [PrController::class, 'getJobs'])->name('api.jobs');
     Route::get('/api/sites/{site}/departments', [\App\Http\Controllers\Admin\DepartmentController::class, 'getDepartmentsBySite'])->name('api.sites.departments');
     
     // Approval Routes
     Route::get('/approvals', [ApprovalController::class, 'index'])->name('approval.index');
     Route::post('/approvals/{approval}/approve', [ApprovalController::class, 'approve'])->name('approval.approve');
     Route::post('/approvals/{approval}/reject', [ApprovalController::class, 'reject'])->name('approval.reject');
+    Route::post('/approvals/{approval}/hold', [ApprovalController::class, 'hold'])->name('approval.hold');
 });
 
 require __DIR__.'/auth.php';

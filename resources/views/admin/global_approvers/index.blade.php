@@ -3,7 +3,7 @@
         <div class="flex justify-between items-center">
             <div>
                 <h2 class="text-2xl font-bold text-gray-800">Konfigurasi Approval Head Office</h2>
-                <p class="text-sm text-gray-500">Atur approver yang akan ditambahkan otomatis untuk departemen yang mewajibkan approval HO.</p>
+                <p class="text-sm text-gray-500">Atur approver yang akan ditambahkan otomatis untuk unit yang mewajibkan approval HO.</p>
             </div>
         </div>
 

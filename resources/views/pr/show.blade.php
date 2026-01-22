@@ -1,7 +1,7 @@
 <x-app-layout>
     @php
-        // Find the next approval step (lowest level pending)
-        $nextApproval = $pr->approvals->where('status', 'Pending')->sortBy('level')->first();
+        // Find the next approval step (lowest level pending or on hold)
+        $nextApproval = $pr->approvals->whereIn('status', ['Pending', 'On Hold'])->sortBy('level')->first();
         
         $canApprove = false;
         $currentApproval = null;
@@ -18,7 +18,7 @@
         $isHO = auth()->user()->hasRole('admin') || \App\Models\GlobalApproverConfig::where('user_id', auth()->id())->exists(); 
     @endphp
 
-    <div class="max-w-4xl mx-auto space-y-6">
+    <div class="max-w-7xl mx-auto space-y-6">
         <!-- Header -->
         <div class="flex justify-between items-start">
             <div>
@@ -29,6 +29,7 @@
                 @php
                     $statusColor = match($pr->status) {
                         'Pending' => 'bg-yellow-100 text-yellow-800',
+                        'On Hold' => 'bg-orange-100 text-orange-800',
                         'Approved' => 'bg-green-100 text-green-800',
                         'Rejected' => 'bg-red-100 text-red-800',
                         default => 'bg-gray-100 text-gray-800',
@@ -76,8 +77,26 @@
                     <span class="block text-sm font-medium text-gray-800">{{ $pr->request_date->format('d M Y') }}</span>
                 </div>
                 <div>
-                    <span class="block text-xs text-gray-400 uppercase">Departemen</span>
-                    <span class="block text-sm font-medium text-gray-800">{{ $pr->department->name ?? '-' }} ({{ $pr->department->code ?? '-' }})</span>
+                    <span class="block text-xs text-gray-400 uppercase">Jenis/Pekerjaan/Unit/Stadium/Kategori</span>
+                    <span class="block text-sm font-medium text-gray-800">
+                        {{ $pr->department->name ?? '-' }}
+                        @if($pr->subDepartment)
+                             / {{ $pr->subDepartment->name }}
+                        @endif
+                        @php
+                            $budgetType = $pr->department->budget_type;
+                            $job = $pr->items->first()->job ?? null;
+                            
+                            $isJob = $budgetType === \App\Enums\BudgetingType::JOB_COA;
+                            $isStation = $budgetType === \App\Enums\BudgetingType::STATION;
+                        @endphp
+
+                        @if($isJob && $job)
+                             / {{ $job->code ?? '' }}{{ $job->code ? '-' : '' }}{{ $job->name }}
+                        @elseif($isStation && $pr->subDepartment && $pr->subDepartment->coa)
+                             / {{ $pr->subDepartment->coa }}
+                        @endif
+                    </span>
                 </div>
                 <div>
                     <span class="block text-xs text-gray-400 uppercase">Total Estimasi</span>
@@ -104,8 +123,10 @@
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
+
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kode Barang</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Barang</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keterangan</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty Original</th>
                         @if($canApprove && $isHO)
                            <th class="px-6 py-3 text-left text-xs font-medium text-blue-600 uppercase tracking-wider bg-blue-50">Adjust Qty</th>
@@ -113,14 +134,15 @@
                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty Final</th>
                         @endif
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Satuan</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Estimasi</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Harga Satuan</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total Yang Diajukan</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Link</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     @foreach($pr->items as $item)
                         <tr>
+
                             <td class="px-6 py-4 text-sm text-gray-500">
                                 {{ $item->product->code ?? '-' }}
                             </td>
@@ -129,6 +151,9 @@
                                 @if($item->specification)
                                     <div class="text-xs text-gray-500 mt-0.5">{{ $item->specification }}</div>
                                 @endif
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-500">
+                                {{ $item->remarks ?? '-' }}
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-900">
                                 {{ $item->quantity }}
@@ -141,7 +166,8 @@
                                            class="w-24 border-blue-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm" 
                                            min="0" 
                                            step="1"
-                                           value="{{ $item->getFinalQuantity() }}">
+                                           placeholder="{{ $item->getFinalQuantity() }}"
+                                           value="">
                                 </td>
                             @else
                                 <td class="px-6 py-4 text-sm text-gray-900">
@@ -152,18 +178,26 @@
                                     
                                     @if($hasAdjustment)
                                         <div class="flex items-center gap-2">
-                                            <svg class="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                            <span class="text-xs text-gray-400 line-through">{{ $item->quantity }}</span>
                                             <span class="font-bold text-blue-600">{{ $finalQty }}</span>
                                         </div>
                                     @else
-                                        -
+                                        <span class="text-gray-900">{{ $finalQty }}</span>
                                     @endif
                                 </td>
                             @endif
 
                             <td class="px-6 py-4 text-sm text-gray-500">{{ $item->unit }}</td>
                             <td class="px-6 py-4 text-sm text-gray-900 text-right">Rp {{ number_format($item->price_estimation, 0, ',', '.') }}</td>
-                            <td class="px-6 py-4 text-sm font-medium text-gray-900 text-right">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</td>
+                            <td class="px-6 py-4 text-sm font-medium text-gray-900 text-right">
+                                @php
+                                    $displayTotal = $item->subtotal;
+                                    if ($pr->status === 'Approved') {
+                                        $displayTotal = $item->getFinalQuantity() * $item->price_estimation;
+                                    }
+                                @endphp
+                                Rp {{ number_format($displayTotal, 0, ',', '.') }}
+                            </td>
                             <td class="px-6 py-4 text-sm">
                                 @if($item->url_link)
                                     <a href="{{ $item->url_link }}" target="_blank" class="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded border border-blue-200 hover:bg-blue-100 transition-colors" title="Buka Link Referensi">
@@ -182,11 +216,15 @@
         
         @if($canApprove)
             <!-- Approval Actions -->
-            <div class="bg-white rounded-xl shadow-sm p-6 space-y-4">
+            <div class="bg-white rounded-xl shadow-sm p-6 space-y-4 mt-6">
                 <h3 class="text-lg font-bold text-gray-800">Tindakan Approval</h3>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Catatan / Alasan (Opsional untuk Approve, Wajib untuk Reject)</label>
-                    <textarea name="remarks" id="remarks-input" rows="3" class="w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500" placeholder="Tulis catatan disini..."></textarea>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Catatan / Alasan (Opsional untuk Approve, Wajib untuk Reject/Hold)</label>
+                    <textarea name="remarks" id="remarks-input" rows="3" class="w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500 transition-colors" placeholder="Tulis catatan disini..."></textarea>
+                    <p id="remarks-error" class="hidden text-sm text-red-600 mt-1 font-medium flex items-center gap-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span>Mohon isi catatan/alasan terlebih dahulu.</span>
+                    </p>
                 </div>
                 
                 <div class="flex justify-end gap-3 pt-2">
@@ -195,6 +233,12 @@
                              onclick="return validateReject()"
                              class="px-6 py-2.5 bg-red-50 text-red-600 font-medium rounded-lg hover:bg-red-100 transition focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
                          Reject PR
+                     </button>
+                     <button type="submit" 
+                             formaction="{{ route('approval.hold', $currentApproval->id) }}"
+                             onclick="return validateHold()"
+                             class="px-6 py-2.5 bg-orange-50 text-orange-600 font-medium rounded-lg hover:bg-orange-100 transition focus:ring-2 focus:ring-orange-500 focus:ring-offset-2">
+                         Hold PR
                      </button>
                      <button type="submit" 
                              formaction="{{ route('approval.approve', $currentApproval->id) }}"
@@ -207,14 +251,40 @@
         </form>
         
         <script>
+            function showError(message) {
+                const errorEl = document.getElementById('remarks-error');
+                const textarea = document.getElementById('remarks-input');
+                
+                errorEl.querySelector('span').innerText = message;
+                errorEl.classList.remove('hidden');
+                textarea.classList.add('border-red-500', 'ring-1', 'ring-red-500');
+                textarea.classList.remove('border-gray-300');
+                textarea.focus();
+                
+                // Remove error on input
+                textarea.addEventListener('input', function() {
+                    errorEl.classList.add('hidden');
+                    textarea.classList.remove('border-red-500', 'ring-1', 'ring-red-500');
+                    textarea.classList.add('border-gray-300');
+                }, { once: true });
+            }
+
             function validateReject() {
                 const remarks = document.getElementById('remarks-input').value;
                 if (!remarks.trim()) {
-                    alert('Mohon isi catatan/alasan untuk melakukan Reject.');
-                    document.getElementById('remarks-input').focus();
+                    showError('Mohon isi catatan/alasan untuk melakukan Reject.');
                     return false;
                 }
-                return confirm('Apakah Anda yakin ingin MENOLAK pengajuan ini?');
+                return true;
+            }
+
+            function validateHold() {
+                const remarks = document.getElementById('remarks-input').value;
+                if (!remarks.trim()) {
+                    showError('Mohon isi catatan/alasan untuk menunda (Hold) pengajuan ini.');
+                    return false;
+                }
+                return true;
             }
         </script>
         @endif
@@ -226,7 +296,7 @@
                 @foreach($pr->approvals as $approval)
                     <div class="relative">
                         <!-- Dot -->
-                        <div class="absolute -left-[31px] bg-white border-2 {{ $approval->status === 'Approved' ? 'border-green-500' : ($approval->status === 'Rejected' ? 'border-red-500' : 'border-gray-300') }} w-4 h-4 rounded-full"></div>
+                        <div class="absolute -left-[31px] bg-white border-2 {{ $approval->status === 'Approved' ? 'border-green-500' : ($approval->status === 'Rejected' ? 'border-red-500' : ($approval->status === 'On Hold' ? 'border-orange-500' : 'border-gray-300')) }} w-4 h-4 rounded-full"></div>
                         
                         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                             <div>
@@ -239,6 +309,9 @@
                                      <span class="block text-xs text-gray-400 text-right">{{ $approval->approved_at ? $approval->approved_at->format('d M H:i') : '' }}</span>
                                 @elseif($approval->status === 'Rejected')
                                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Rejected</span>
+                                     <span class="block text-xs text-gray-400 text-right">{{ $approval->approved_at ? $approval->approved_at->format('d M H:i') : '' }}</span>
+                                @elseif($approval->status === 'On Hold')
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">On Hold</span>
                                      <span class="block text-xs text-gray-400 text-right">{{ $approval->approved_at ? $approval->approved_at->format('d M H:i') : '' }}</span>
                                 @else
                                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Pending</span>

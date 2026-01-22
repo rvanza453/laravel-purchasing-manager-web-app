@@ -48,7 +48,7 @@
                                 <div>
                                     <h3 class="text-lg font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{{ $s->name }}</h3>
                                     <p class="text-sm font-semibold text-indigo-600">Rp {{ number_format($s->total_budget, 0, ',', '.') }}</p>
-                                    <p class="text-xs text-gray-500">{{ $s->dept_count }} Departemen</p>
+                                    <p class="text-xs text-gray-500">{{ $s->dept_count }} Unit</p>
                                 </div>
                             </div>
                         </div>
@@ -68,7 +68,7 @@
                                 <div>
                                     <h3 class="text-lg font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{{ $d->name }}</h3>
                                     <p class="text-sm font-semibold text-indigo-600">Rp {{ number_format($d->total_budget, 0, ',', '.') }}</p>
-                                    <p class="text-xs text-gray-500">{{ $d->subDepartments->count() }} Sub Departemen</p>
+                                    <p class="text-xs text-gray-500">{{ $d->subDepartments->count() }} Stasiun / Afdeling</p>
                                 </div>
                             </div>
                         </div>
@@ -81,7 +81,7 @@
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sub Departemen</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stasiun / Afdeling</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total Budget Configured</th>
                             <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
                         </tr>
@@ -101,7 +101,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="3" class="px-6 py-4 text-center text-gray-500">Belum ada sub departemen di departemen ini.</td>
+                                <td colspan="3" class="px-6 py-4 text-center text-gray-500">Belum ada Stasiun / afdeling di unit ini.</td>
                             </tr>
                         @endforelse
                     </tbody>
