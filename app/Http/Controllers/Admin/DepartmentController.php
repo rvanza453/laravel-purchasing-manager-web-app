@@ -37,8 +37,11 @@ class DepartmentController extends Controller
     public function edit(Department $department)
     {
         $sites = Site::all();
-        // Filter users strictly by the same site as the department
-        $users = User::where('site_id', $department->site_id)->orderBy('name')->get();
+        // Filter users strictly by the same site as the department AND has 'Approver' role
+        $users = User::where('site_id', $department->site_id)
+            ->role('Approver')
+            ->orderBy('name')
+            ->get();
         
         // No need to load subDepartments here anymore
 
@@ -53,10 +56,12 @@ class DepartmentController extends Controller
             'approvers.*.role_name' => 'required|string',
             'approvers.*.level' => 'required|integer',
             'use_global_approval' => 'boolean',
+            'budget_type' => 'required|in:station,job_coa',
         ]);
 
         $department->update([
-            'use_global_approval' => $request->has('use_global_approval')
+            'use_global_approval' => $request->has('use_global_approval'),
+            'budget_type' => $request->budget_type,
         ]);
 
         // Sync Approvers
@@ -70,6 +75,8 @@ class DepartmentController extends Controller
                 ]);
             }
         }
+
+        \App\Helpers\ActivityLogger::log('updated', 'Updated Department Configuration: ' . $department->name, $department);
 
         return redirect()->route('departments.index')->with('success', 'Approval configuration updated successfully.');
     }

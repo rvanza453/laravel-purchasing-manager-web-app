@@ -13,6 +13,10 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         // $schedule->command('inspire')->hourly();
+        $schedule->command('pr:notify-pending')
+                 ->dailyAt('10:00')
+                 ->weekdays()
+                 ->timezone('Asia/Jakarta');
     }
 
     /**

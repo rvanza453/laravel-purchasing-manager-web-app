@@ -14,7 +14,7 @@ return new class extends Migration
             $table->string('code')->unique()->index();
             $table->string('unit'); // Base unit
             $table->integer('min_stock')->default(0);
-            $table->string('category')->nullable(); // e.g. Sparepart, ATK (grouping)
+            $table->string('category')->nullable();
             $table->timestamps();
         });
     }

@@ -29,12 +29,12 @@
 
         <!-- Department -->
         <div>
-            <x-input-label for="department_id" :value="__('Departemen')" />
+            <x-input-label for="department_id" :value="__('Unit')" />
              <select id="department_id" name="department_id" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" style="background-color: #ffffff !important; color: #000000 !important; opacity: 1 !important;">
-                <option value="">-- Pilih Departemen --</option>
+                <option value="">-- Pilih Unit --</option>
                 @foreach($departments as $dept)
                     <option value="{{ $dept->id }}" {{ $user->department_id == $dept->id ? 'selected' : '' }}>
-                        {{ $dept->name }} ({{ $dept->code }})
+                        {{ $dept->name }} ({{ $dept->coa }})
                     </option>
                 @endforeach
             </select>

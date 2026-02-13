@@ -7,6 +7,7 @@ use App\Models\Department;
 use App\Models\Product;
 use App\Services\PrService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PrController extends Controller
 {
@@ -20,56 +21,469 @@ class PrController extends Controller
     public function index(\Illuminate\Http\Request $request)
     {
         $user = auth()->user();
-        $query = PurchaseRequest::with(['department', 'subDepartment']);
+        $query = PurchaseRequest::with(['department', 'subDepartment', 'items']);
+        // Eager load relationships including approver
+        $query->with(['department', 'subDepartment', 'items.job', 'approvals.approver']);
 
-        // --- Core Visibility Logic (DO NOT CHANGE) ---
-        $isHO = $user->hasRole('admin') 
-                || ($user->site && $user->site->code === 'HO')
+        // --- Core Visibility Logic ---
+        // Global Access: Admin, Finance, Global Approver, OR Approver stationed at HO
+        $isGlobal = $user->hasRole(['Admin', 'Finance']) 
+                || ($user->hasRole('Approver') && $user->site && $user->site->code === 'HO')
                 || \App\Models\GlobalApproverConfig::where('user_id', $user->id)->exists();
 
-        if ($isHO) {
-            // HO sees ALL PRs
+        // Prepare Departments for Filter
+        if ($isGlobal) {
+            $departments = Department::with('subDepartments')->orderBy('name')->get();
+        } elseif ($user->hasRole(['Purchasing', 'Approver'])) {
+            // Purchasing & Approvers: Departments in their SITE
+            $departments = Department::with('subDepartments')->where('site_id', $user->site_id)->orderBy('name')->get();
+        } elseif ($user->department_id) {
+             $departments = Department::with('subDepartments')->where('id', $user->department_id)->get();
         } else {
-            // Site Staff: View PRs from their Department
-            if ($user->department_id) {
-                $query->where('department_id', $user->department_id);
-            } else {
-                $query->where('user_id', $user->id);
-            }
+             $departments = collect();
         }
-        // ---------------------------------------------
 
-        // --- Search & Filters ---
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('pr_number', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+        $viewMode = $request->get('view_mode', 'pr');
+
+        // Helper closure for visibility filter
+        $applyVisibility = function($q) use ($isGlobal, $user) {
+            if ($isGlobal) {
+                return; // No filter
+            }
+            if ($user->hasRole(['Purchasing', 'Approver'])) {
+                // Purchasing & Approvers: See All Departments in their SITE
+                $q->whereHas('department', function($d) use ($user) {
+                    $d->where('site_id', $user->site_id);
+                });
+            } else {
+                 // Staff: Own PRs
+                 $q->where('user_id', $user->id);
+            }
+        };
+
+        if ($viewMode === 'items') {
+            $query = \App\Models\PrItem::with(['purchaseRequest', 'product', 'purchaseRequest.department', 'purchaseRequest.subDepartment'])
+                 ->whereHas('purchaseRequest', function($q) use ($applyVisibility) {
+                     $applyVisibility($q);
+                 });
+
+            // ... (Search filters remain same) ...
+            // Search Filter
+             if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function($q) use ($search) {
+                    $q->where('item_name', 'like', "%{$search}%")
+                      ->orWhereHas('purchaseRequest', function($sq) use ($search) {
+                           $sq->where('pr_number', 'like', "%{$search}%");
+                      });
+                });
+            }
+            
+            // ... (Copying existing logical blocks for filters)
+            if ($request->filled('status')) {
+                $status = $request->status;
+                $query->whereHas('purchaseRequest', function($q) use ($status) {
+                    if ($status === \App\Enums\PrStatus::PENDING->value) {
+                        $q->whereIn('status', [\App\Enums\PrStatus::PENDING->value, \App\Enums\PrStatus::ON_HOLD->value]);
+                    } else {
+                        $q->where('status', $status);
+                    }
+                });
+            }
+
+            if ($request->filled('department_id')) {
+                 $query->whereHas('purchaseRequest', function($q) use ($request) {
+                    $q->where('department_id', $request->department_id);
+                });
+            }
+
+            if ($request->filled('sub_department_id')) {
+                 $query->whereHas('purchaseRequest', function($q) use ($request) {
+                    $q->where('sub_department_id', $request->sub_department_id);
+                });
+            }
+            
+            if ($request->filled('start_date')) {
+                 $query->whereHas('purchaseRequest', function($q) use ($request) {
+                    $q->whereDate('request_date', '>=', $request->start_date);
+                });
+            }
+
+            if ($request->filled('end_date')) {
+                 $query->whereHas('purchaseRequest', function($q) use ($request) {
+                    $q->whereDate('request_date', '<=', $request->end_date);
+                });
+            }
+
+            $items = $query->orderBy('item_name')->orderByDesc('id')->paginate(20);
+            $prs = null;
+        } else {
+            // -- PR VIEW --
+            $items = null;
+            
+            // Apply Visibility
+            $applyVisibility($query);
+
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function($q) use ($search) {
+                    $q->where('pr_number', 'like', "%{$search}%")
+                      ->orWhere('description', 'like', "%{$search}%");
+                });
+            }
+
+            if ($request->filled('status')) {
+                if ($request->status === \App\Enums\PrStatus::PENDING->value) {
+                    $query->whereIn('status', [\App\Enums\PrStatus::PENDING->value, \App\Enums\PrStatus::ON_HOLD->value]);
+                } else {
+                    $query->where('status', $request->status);
+                }
+            }
+
+            if ($request->filled('department_id')) {
+                $query->where('department_id', $request->department_id);
+            }
+
+            if ($request->filled('sub_department_id')) {
+                $query->where('sub_department_id', $request->sub_department_id);
+            }
+
+            if ($request->filled('start_date')) {
+                $query->whereDate('request_date', '>=', $request->start_date);
+            }
+
+            if ($request->filled('end_date')) {
+                $query->whereDate('request_date', '<=', $request->end_date);
+            }
+
+            if ($request->filled('current_approver_id')) {
+                $approverId = $request->current_approver_id;
+                $query->where(function($q) use ($approverId) {
+                    $q->whereIn('status', ['Pending', 'On Hold'])
+                      ->whereHas('approvals', function($aq) use ($approverId) {
+                          $aq->where('approver_id', $approverId)
+                             ->where('status', 'Pending');
+                      })
+                      ->whereDoesntHave('approvals', function($aq) use ($approverId) {
+                          $aq->where('status', 'Pending')
+                             ->whereRaw('level < (
+                                 SELECT level FROM pr_approvals 
+                                 WHERE purchase_request_id = purchase_requests.id 
+                                 AND approver_id = ? 
+                                 AND status = "Pending"
+                                 LIMIT 1
+                             )', [$approverId]);
+                      });
+                });
+            }
+            
+            $prs = $query->orderBy('created_at', 'desc')->paginate(10);
+        }
+        
+        $approvers = collect();
+        if ($viewMode === 'pr') {
+            $cacheKey = 'pr_current_approvers_' . $user->id . '_' . ($isGlobal ? 'global' : $user->site_id);
+            
+            $approvers = \Cache::remember($cacheKey, 300, function() use ($user, $isGlobal) {
+                
+                $query = \DB::table('purchase_requests as pr')
+                    ->join('pr_approvals as pa', 'pr.id', '=', 'pa.purchase_request_id')
+                    ->join('users as u', 'pa.approver_id', '=', 'u.id')
+                    ->whereIn('pr.status', ['Pending', 'On Hold'])
+                    ->where('pa.status', 'Pending')
+                    ->select('u.id', 'u.name', 'pa.level', 'pr.id as pr_id');
+                
+                if (!$isGlobal) {
+                    if ($user->hasRole(['Purchasing', 'Approver'])) {
+                        $query->join('departments as d', 'pr.department_id', '=', 'd.id')
+                              ->where('d.site_id', $user->site_id);
+                    } else {
+                        $query->where('pr.user_id', $user->id);
+                    }
+                }
+                
+                $pendingApprovals = $query->get();
+                
+                // Group by PR to find the actual current approver (lowest pending level)
+                $currentApprovers = [];
+                $prGroups = $pendingApprovals->groupBy('pr_id');
+                
+                foreach ($prGroups as $prId => $approvals) {
+                    // Get the approval with the lowest level (first in workflow)
+                    $lowestLevel = $approvals->min('level');
+                    $currentApproval = $approvals->where('level', $lowestLevel)->first();
+                    
+                    if ($currentApproval && !isset($currentApprovers[$currentApproval->id])) {
+                        $currentApprovers[$currentApproval->id] = [
+                            'id' => $currentApproval->id,
+                            'name' => $currentApproval->name
+                        ];
+                    }
+                }
+                
+                // Convert to collection and sort
+                return collect($currentApprovers)
+                    ->sortBy('name')
+                    ->values()
+                    ->map(fn($item) => (object)$item);
             });
         }
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
+        return view('pr.index', compact('prs', 'items', 'departments', 'viewMode', 'approvers'));
+    }
 
-        if ($request->filled('start_date')) {
-            $query->whereDate('request_date', '>=', $request->start_date);
-        }
+    public function export(Request $request) 
+    {
+        $user = auth()->user();
+        $viewMode = $request->get('view_mode', 'pr');
+        $fileName = 'rekap_pr_' . date('Y-m-d_H-i') . '.csv';
 
-        if ($request->filled('end_date')) {
-            $query->whereDate('request_date', '<=', $request->end_date);
-        }
-        // ------------------------
-        
-        $prs = $query->orderBy('created_at', 'desc')->paginate(10); // Added pagination for better UI
+        $headers = [
+            "Content-type"        => "text/csv",
+            "Content-Disposition" => "attachment; filename=$fileName",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
+
+        $callback = function() use ($viewMode, $request, $user) {
+            $file = fopen('php://output', 'w');
             
-        return view('pr.index', compact('prs'));
+            // Re-apply Visibility Logic
+            $isGlobal = $user->hasRole(['Admin', 'Finance']) 
+                    || ($user->hasRole('Approver') && $user->site && $user->site->code === 'HO')
+                    || \App\Models\GlobalApproverConfig::where('user_id', $user->id)->exists();
+
+            $applyVisibility = function($q) use ($isGlobal, $user) {
+                if ($isGlobal) return;
+                if ($user->hasRole(['Purchasing', 'Approver'])) {
+                    $q->whereHas('department', function($d) use ($user) {
+                        $d->where('site_id', $user->site_id);
+                    });
+                } else {
+                    $q->where('user_id', $user->id);
+                }
+            };
+
+            if ($viewMode === 'items') {
+                // ITEM EXPORT
+                fputcsv($file, [
+                    'No. PR', 
+                    'Tanggal Request', 
+                    'Requester', 
+                    'Unit', 
+                    'Sub Unit', 
+                    'Status PR',
+                    'Kode Barang', 
+                    'Nama Barang', 
+                    'Spesifikasi', 
+                    'Kategori',
+                    'Qty', 
+                    'Satuan', 
+                    'Harga Satuan (Est)', 
+                    'Total Harga (Est)', 
+                    'Job', 
+                    'No. PO', 
+                    'Link URL', 
+                    'Keterangan'
+                ]);
+
+                $itemQuery = \App\Models\PrItem::with(['purchaseRequest.department', 'purchaseRequest.subDepartment', 'purchaseRequest.user', 'product', 'job', 'poItems.purchaseOrder'])
+                     ->whereHas('purchaseRequest', function($q) use ($applyVisibility) {
+                         $applyVisibility($q);
+                     });
+
+                // Apply Filters
+                if ($request->filled('search')) {
+                    $search = $request->search;
+                    $itemQuery->where(function($q) use ($search) {
+                        $q->where('item_name', 'like', "%{$search}%")
+                          ->orWhereHas('purchaseRequest', function($sq) use ($search) {
+                               $sq->where('pr_number', 'like', "%{$search}%");
+                          });
+                    });
+                }
+                
+                if ($request->filled('status')) {
+                    $status = $request->status;
+                    $itemQuery->whereHas('purchaseRequest', function($q) use ($status) {
+                        if ($status === \App\Enums\PrStatus::PENDING->value) {
+                            $q->whereIn('status', [\App\Enums\PrStatus::PENDING->value, \App\Enums\PrStatus::ON_HOLD->value]);
+                        } else {
+                            $q->where('status', $status);
+                        }
+                    });
+                }
+
+                if ($request->filled('department_id')) {
+                     $itemQuery->whereHas('purchaseRequest', function($q) use ($request) {
+                        $q->where('department_id', $request->department_id);
+                    });
+                }
+
+                if ($request->filled('sub_department_id')) {
+                     $itemQuery->whereHas('purchaseRequest', function($q) use ($request) {
+                        $q->where('sub_department_id', $request->sub_department_id);
+                    });
+                }
+                
+                if ($request->filled('start_date')) {
+                     $itemQuery->whereHas('purchaseRequest', function($q) use ($request) {
+                        $q->whereDate('request_date', '>=', $request->start_date);
+                    });
+                }
+
+                if ($request->filled('end_date')) {
+                     $itemQuery->whereHas('purchaseRequest', function($q) use ($request) {
+                        $q->whereDate('request_date', '<=', $request->end_date);
+                    });
+                }
+
+                $itemQuery->orderBy('id')->chunk(500, function($items) use ($file) {
+                    foreach ($items as $item) {
+                        $pr = $item->purchaseRequest;
+                        
+                        // Get PO Number (Using helper from PrItem or manual Check)
+                        $poNumber = '-';
+                        if ($item->poItems->isNotEmpty()) {
+                             $poNumbers = $item->poItems->map(fn($pi) => $pi->purchaseOrder->po_number ?? '-')->unique()->implode(', ');
+                             $poNumber = $poNumbers ?: '-';
+                        }
+
+                        // Determine Category
+                        $category = '-';
+                        if ($item->product) {
+                            $category = $item->product->category ?? '-';
+                        } elseif ($item->manual_category) {
+                            $category = $item->manual_category;
+                        }
+
+                        // NORMALIZE (User Request: Merge All to Sparepart for consistency with Budget)
+                        if (in_array($category, ['Material', 'material', 'Consumable', 'consumable', 'Bahan Pembantu'])) {
+                            $category = 'Sparepart';
+                        }
+
+                        fputcsv($file, [
+                            $pr ? $pr->pr_number : '-',
+                            $pr ? $pr->request_date->format('d/m/Y') : '-',
+                            $pr && $pr->user ? $pr->user->name : '-',
+                            $pr && $pr->department ? $pr->department->name : '-',
+                            $pr && $pr->subDepartment ? $pr->subDepartment->name : '-',
+                            $pr ? $pr->status : '-',
+                            $item->product ? $item->product->code : ($item->manual_category ? 'Manual' : '-'),
+                            $item->item_name,
+                            $item->specification ?? '-',
+                            $category,
+                            $item->quantity,
+                            $item->unit,
+                            $item->price_estimation,
+                            $item->subtotal,
+                            $item->job ? $item->job->code . ' - ' . $item->job->name : '-',
+                            $poNumber,
+                            $item->url_link ?? '-',
+                            $item->remarks
+                        ]);
+                    }
+                });
+
+            } else {
+                fputcsv($file, [
+                    'No. PR', 
+                    'Tanggal Request', 
+                    'Requester', 
+                    'Unit', 
+                    'Sub Unit', 
+                    'Job',
+                    'Status', 
+                    'Posisi Approval',
+                    'Jumlah Item', 
+                    'Total Estimasi', 
+                    'Keterangan'
+                ]);
+                
+                $query = PurchaseRequest::with(['department', 'subDepartment', 'items.job', 'user', 'approvals']);
+                $applyVisibility($query);
+
+                if ($request->filled('search')) {
+                    $search = $request->search;
+                    $query->where(function($q) use ($search) {
+                        $q->where('pr_number', 'like', "%{$search}%")
+                          ->orWhere('description', 'like', "%{$search}%");
+                    });
+                }
+
+                if ($request->filled('status')) {
+                    if ($request->status === \App\Enums\PrStatus::PENDING->value) {
+                        $query->whereIn('status', [\App\Enums\PrStatus::PENDING->value, \App\Enums\PrStatus::ON_HOLD->value]);
+                    } else {
+                        $query->where('status', $request->status);
+                    }
+                }
+
+                if ($request->filled('department_id')) {
+                    $query->where('department_id', $request->department_id);
+                }
+
+                if ($request->filled('sub_department_id')) {
+                    $query->where('sub_department_id', $request->sub_department_id);
+                }
+
+                if ($request->filled('start_date')) {
+                    $query->whereDate('request_date', '>=', $request->start_date);
+                }
+
+                if ($request->filled('end_date')) {
+                    $query->whereDate('request_date', '<=', $request->end_date);
+                }
+
+                $query->orderBy('created_at', 'desc')->chunk(500, function($prs) use ($file) {
+                    foreach ($prs as $pr) {
+                        // Determine Approval Position
+                        $approvalPos = '-';
+                        if ($pr->status === \App\Enums\PrStatus::PENDING->value) {
+                             $nextApproval = $pr->approvals->where('status', 'Pending')->sortBy('level')->first();
+                             if ($nextApproval) {
+                                  // Can show Role or User if assigned
+                                  $approvalPos = $nextApproval->role; 
+                                  if ($nextApproval->user_id && $nextApproval->approver) {
+                                      $approvalPos .= " (" . $nextApproval->approver->name . ")";
+                                  }
+                             }
+                        } elseif ($pr->status === \App\Enums\PrStatus::APPROVED->value) {
+                            $approvalPos = 'Completed';
+                        }
+
+                        // Collect Jobs
+                        $jobs = $pr->items->map(function($item) {
+                            return $item->job ? ($item->job->code . ' - ' . $item->job->name) : null;
+                        })->filter()->unique()->implode(', ');
+
+                        fputcsv($file, [
+                            $pr->pr_number,
+                            $pr->request_date->format('d/m/Y'),
+                            $pr->user->name ?? '-',
+                            $pr->department->name ?? '-',
+                            $pr->subDepartment->name ?? '-',
+                            $jobs ?: '-',
+                            $pr->status,
+                            $approvalPos,
+                            $pr->items->count(),
+                            $pr->final_total, 
+                            $pr->description
+                        ]);
+                    }
+                });
+            }
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
 
     public function create()
     {
         // Filter departments: Admin sees all, Staff sees only their own
-        if (auth()->user()->hasRole('admin')) {
+        if (auth()->user()->hasRole('Admin')) {
             $departments = Department::with(['site', 'subDepartments'])->orderBy('name')->get();
         } else {
             // Check if user has a department assigned
@@ -84,192 +498,430 @@ class PrController extends Controller
                 $departments = collect(); 
             }
         }
-
-        $products = Product::whereNotNull('category')->orderBy('name')->get(); 
         
+        $year = date('Y');
+
+        $departments->load(['subDepartments' => function($q) use ($year) {
+             $q->whereHas('budgets', function($b) use ($year) {
+                 $b->where('year', $year)
+                   ->where('amount', '>', 0);
+             });
+        }]);
+
+        $products = collect(); 
+        
+        if ($departments->count() === 1) {
+            $siteId = $departments->first()->site_id;
+            $products = \App\Models\Product::whereHas('sites', function($q) use ($siteId) {
+                $q->where('sites.id', $siteId);
+            })->whereNotNull('category')->orderBy('name')->get();
+        }
+
         $categories = config('options.product_categories');
+        
         return view('pr.create', compact('departments', 'products', 'categories'));
+    }
+
+    public function getProductsBySite($siteId)
+    {
+        $products = \App\Models\Product::whereHas('sites', function($query) use ($siteId) {
+            $query->where('sites.id', $siteId);
+        })
+        ->whereNotNull('category')
+        ->orderBy('name')
+        ->get();
+
+        return response()->json($products);
     }
 
     public function store(Request $request)
     {
         $request->validate([
             'department_id' => 'required|exists:departments,id',
-            'sub_department_id' => 'required|exists:sub_departments,id', // Mandatory now
+            'sub_department_id' => 'nullable|exists:sub_departments,id', 
             'request_date' => 'required|date',
-            'description' => 'required|string',
+            'description' => 'nullable|string',
+            'attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:10240',
             'items' => 'required|array|min:1',
             'items.*.product_id' => [
                 'nullable', 
                 function ($attribute, $value, $fail) {
-                    if ($value === 'manual') return; // validation pass
+                    if ($value === 'manual') return; 
                     if (!empty($value) && !\App\Models\Product::where('id', $value)->exists()) {
                          $fail('Selected product is invalid.');
                     }
                 }
             ],
+            // New Validation for Job
+            'items.*.job_id' => [
+                'nullable',
+                function ($attribute, $value, $fail) use ($request) {
+                    $dept = Department::find($request->department_id);
+                    if ($dept && $dept->budget_type === \App\Enums\BudgetingType::JOB_COA) {
+                        if (empty($value)) {
+                            $fail('Job / Pekerjaan harus dipilih untuk unit ini.');
+                        } elseif (!\App\Models\Job::where('id', $value)->exists()) {
+                            $fail('Selected job is invalid.');
+                        }
+                    }
+                }
+            ],
             'items.*.item_name' => 'required|string', 
             'items.*.specification' => 'nullable|string',
+            'items.*.remarks' => 'nullable|string',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.unit' => 'required|string',
             'items.*.price_estimation' => 'required|numeric|min:0',
             'items.*.manual_category' => 'nullable|string',
-            'items.*.url_link' => 'nullable|string|url', // Add validation for URL
+            'items.*.url_link' => 'nullable|string|url', 
         ]);
         
-        // Custom Validation for Manual Category
-        foreach ($request->items as $index => $item) {
-             $pid = $item['product_id'] ?? null;
-             if (($pid === 'manual' || empty($pid)) && empty($item['manual_category'])) {
-                 return back()->withErrors(["items.{$index}.manual_category" => "Category is required for manual items."])->withInput();
-             }
+        // Custom Validation for Manual Category (Only for Station Budget Type)
+        $dept = Department::find($request->department_id);
+        if ($dept->budget_type === \App\Enums\BudgetingType::STATION) {
+            foreach ($request->items as $index => $item) {
+                 $pid = $item['product_id'] ?? null;
+                 if (($pid === 'manual' || empty($pid)) && empty($item['manual_category'])) {
+                     return back()->withErrors(["items.{$index}.manual_category" => "Category is required for manual items."])->withInput();
+                 }
+            }
         }
 
         // Process items
         $items = collect($request->items)->map(function($item) {
              if (isset($item['product_id']) && $item['product_id'] === 'manual') {
                  $item['product_id'] = null;
+             } elseif (!empty($item['product_id'])) {
+                 // Enforce Catalog Price if Product ID exists
+                 $product = \App\Models\Product::find($item['product_id']);
+                 if ($product) {
+                     $item['price_estimation'] = $product->price_estimation;
+                 }
              }
              return $item;
         })->toArray();
 
-        $itemsByCategory = [];
-        foreach ($items as $item) {
-            $cat = 'Uncategorized';
-            if (!empty($item['product_id'])) {
-                $product = Product::find($item['product_id']);
-                if ($product && $product->category) {
-                    $cat = $product->category;
-                }
-            } elseif (!empty($item['manual_category'])) {
-                $cat = $item['manual_category'];
-            } else {
-                $cat = 'Lain-lain'; 
-            }
-
-            if (!isset($itemsByCategory[$cat])) {
-                $itemsByCategory[$cat] = 0;
-            }
-            $itemsByCategory[$cat] += ($item['price_estimation'] * $item['quantity']);
-        }
-
-        // 2. Check Budget Availability
+        // Budget Checking Logic
         $year = date('Y', strtotime($request->request_date));
         $subDeptId = $request->sub_department_id;
+        $warnings = [];
 
-        foreach ($itemsByCategory as $category => $amountNeeded) {
-            $budget = \App\Models\Budget::where('sub_department_id', $subDeptId)
-                        ->where('category', $category)
-                        ->where('year', $year)
-                        ->first();
-            
-            if (!$budget) {
-                if ($category !== 'Uncategorized') {
-                     return back()->withInput()->withErrors(['budget' => "No budget configured for category '{$category}' in this Sub Department."]);
+        if ($dept->budget_type === \App\Enums\BudgetingType::JOB_COA) {
+            // Group by Job (Since Job is now the budget unit)
+            $itemsByJob = [];
+            foreach ($items as $item) {
+                if (empty($item['job_id'])) continue;
+                $job = \App\Models\Job::find($item['job_id']);
+                if (!$job) continue;
+                
+                $jobId = $job->id;
+                // Combine Code and Name for Label
+                $label = ($job->code ?? '') . ' - ' . $job->name; 
+
+                if (!isset($itemsByJob[$jobId])) {
+                     $itemsByJob[$jobId] = ['amount' => 0, 'name' => $label];
                 }
-                continue; 
+                $itemsByJob[$jobId]['amount'] += ($item['price_estimation'] * $item['quantity']);
             }
 
-            // Calculate current usage (Used in Approved PRs)
-            // Note: Should we include Pending PRs? Usually yes for "Reserved" budget.
-            // Let's include Pending and Approved. Exclude Rejected.
-            $usedAmount = \App\Models\PurchaseRequest::where('sub_department_id', $subDeptId)
-                            ->where('status', '!=', 'Rejected')
-                            ->whereYear('request_date', $year)
-                            ->whereHas('items', function($q) use ($category) {
-                                // This is tricky for manual items if we don't store category in pr_items
-                                // Doing a loose check based on product relation
-                                $q->whereHas('product', function($sq) use ($category) {
-                                    $sq->where('category', $category);
-                                });
-                            })
-                            ->with(['items' => function($q) use ($category) {
-                                $q->whereHas('product', function($sq) use ($category) {
-                                    $sq->where('category', $category);
-                                });
-                            }])
-                            ->get()
-                            ->sum(function($pr) {
-                                return $pr->items->sum('subtotal');
-                            });
+            foreach ($itemsByJob as $jobId => $data) {
+                $amountNeeded = $data['amount'];
+                
+                $budgetQuery = \App\Models\Budget::where('job_id', $jobId)
+                            ->where('year', $year);
+                
+                if ($subDeptId) {
+                    $budgetQuery->where('sub_department_id', $subDeptId);
+                }
+                            
+                $budget = $budgetQuery->first();
 
-            if (($usedAmount + $amountNeeded) > $budget->amount) {
-                $remaining = $budget->amount - $usedAmount;
-                // Allow creation but flash warning
-                $warnings[] = "Budget Exceeded for '{$category}'. Limit: ".number_format($budget->amount).". Used: ".number_format($usedAmount).". Request: ".number_format($amountNeeded).". Remaining: ".number_format($remaining);
+                if (!$budget) {
+                     // If subDept is skipped, we might not want to error strictly if budget doesn't exist?
+                     // Or we error saying "No budget for Job X".
+                     return back()->withInput()->withErrors(['budget' => "No budget configured for Job '{$data['name']}' (Year: {$year})."]);
+                }
+
+                // Check Usage (Consumption-based)
+                $usedAmount = $budget->used_amount;
+                $limit = $budget->amount; 
+
+                if (($usedAmount + $amountNeeded) > $budget->amount) {
+                    $remaining = $budget->amount - $usedAmount;
+                    $warnings[] = "Budget Exceeded for Job '{$data['name']}'. Limit: ".number_format($budget->amount).". Used: ".number_format($usedAmount).". Request: ".number_format($amountNeeded).". Remaining: ".number_format($remaining);
+                }
+            }
+
+        } else {
+            // STATION Budget Type (Existing Logic)
+            $itemsByCategory = [];
+            foreach ($items as $item) {
+                $cat = 'Uncategorized';
+                if (!empty($item['product_id'])) {
+                    $product = Product::find($item['product_id']);
+                    if ($product && $product->category) {
+                        $cat = $product->category;
+                    }
+                } elseif (!empty($item['manual_category'])) {
+                    $cat = $item['manual_category'];
+                } else {
+                    $cat = 'Lain-lain'; 
+                }
+
+                // NORMALIZE CATEGORIES (User Request: Merge All to Sparepart)
+                // Material, Consumable, Bahan Pembantu -> Sparepart
+                if (in_array($cat, ['Material', 'material', 'Consumable', 'consumable', 'Bahan Pembantu', 'bahan pembantu','Lain-lain', 'lain-lain',''])) {
+                    $cat = 'Sparepart';
+                }
+
+                if (!isset($itemsByCategory[$cat])) {
+                    $itemsByCategory[$cat] = 0;
+                }
+                $itemsByCategory[$cat] += ($item['price_estimation'] * $item['quantity']);
+            }
+
+            foreach ($itemsByCategory as $category => $amountNeeded) {
+                // Clean category string
+                $category = trim($category);
+                $budgetCategory = $category; // Already normalized
+                
+                $budget = \App\Models\Budget::where('sub_department_id', $subDeptId)
+                            ->where('category', $budgetCategory)
+                            ->where('year', $year)
+                            ->where(function($query) {
+                                $query->whereNull('job_id')
+                                      ->orWhere('job_id', 0);
+                            })
+                            ->first();
+                
+                if (!$budget) {
+                    if ($category !== 'Uncategorized') {
+                         return back()->withInput()->withErrors(['budget' => "No budget configured for category '{$category}' in this Sub Department (Year: {$year}). Please check Master Budget."]);
+                    }
+                    continue; 
+                }
+
+                $usedAmount = $budget->used_amount;
+                $limit = $budget->amount;
+
+                if ($limit > 0 && ($usedAmount + $amountNeeded) > $limit) {
+                    $remaining = $limit - $usedAmount;
+                    $warnings[] = "Budget Exceeded for '{$category}'. Limit: ".number_format($limit).". Used: ".number_format($usedAmount).". Request: ".number_format($amountNeeded).". Remaining: ".number_format($remaining);
+                } elseif ($limit <= 0) {
+                    $warnings[] = "Category '{$category}' has 0 budget allocated.";
+                }
             }
         }
         
         if (!empty($warnings)) {
-             session()->flash('warning', implode('<br>', $warnings));
+             return back()->withInput()->withErrors(['budget' => implode('<br>', $warnings)]);
         }
 
-        $this->prService->createPr(
-            $request->only('department_id', 'sub_department_id', 'request_date', 'description'), // Add sub_department_id
+        $prData = $request->only('department_id', 'sub_department_id', 'request_date');
+        $prData['description'] = $request->description ?? '-';
+        $prData['is_capex'] = $request->has('is_capex');
+        
+        $attachmentPath = null;
+        if ($request->hasFile('attachment')) {
+            $file = $request->file('attachment');
+            $extension = $file->getClientOriginalExtension();
+            $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+            
+            $year = date('Y', strtotime($request->request_date));
+            $month = date('m', strtotime($request->request_date));
+            
+            $tempPrNumber = 'TEMP_' . uniqid();
+            $fileName = $tempPrNumber . '_' . \Illuminate\Support\Str::slug($originalName) . '.' . $extension;
+            
+            $folderPath = "attachments/pr/{$year}/{$month}";
+            $attachmentPath = $file->storeAs($folderPath, $fileName, 'public');
+            $prData['attachment_path'] = $attachmentPath;
+        }
+
+        $pr = $this->prService->createPr(
+            $prData,
             $items
         );
+        
+        if ($attachmentPath && $pr->pr_number) {
+            $oldPath = storage_path('app/public/' . $attachmentPath);
+            $year = date('Y', strtotime($request->request_date));
+            $month = date('m', strtotime($request->request_date));
+            $extension = pathinfo($attachmentPath, PATHINFO_EXTENSION);
+            $originalName = pathinfo($request->file('attachment')->getClientOriginalName(), PATHINFO_FILENAME);
+            
+            // Sanitize PR Number for filename (replace / with _)
+            $safePrNumber = str_replace(['/', '\\'], '_', $pr->pr_number);
+            
+            $newFileName = $safePrNumber . '_' . \Illuminate\Support\Str::slug($originalName) . '.' . $extension;
+            $newPath = "attachments/pr/{$year}/{$month}/{$newFileName}";
+            $newFullPath = storage_path('app/public/' . $newPath);
+            
+            $newDir = dirname($newFullPath);
+            if (!file_exists($newDir)) {
+                mkdir($newDir, 0755, true);
+            }
+            
+            if (file_exists($oldPath)) {
+                rename($oldPath, $newFullPath);
+                $pr->attachment_path = $newPath;
+                $pr->save();
+            }
+        }
+
+        \App\Helpers\ActivityLogger::log('created', 'Created Purchase Request: ' . $pr->pr_number, $pr);
+
+        if ($pr->is_capex) {
+            return redirect()->route('pr.index')->with('success', 'PR CAPEX berhasil dibuat dan menunggu verifikasi admin.');
+        }
 
         return redirect()->route('pr.index')->with('success', 'PR Submitted successfully.');
     }
 
     public function show(PurchaseRequest $pr)
     {
-        $pr->load('items.product', 'approvals.approver', 'department.site');
+        $pr->load('items.product', 'approvals.approver', 'department.site', 'items.job'); 
         
         // Calculate budget status for this PR
         $year = $pr->request_date->format('Y');
         $subDeptId = $pr->sub_department_id;
-        
-        // Group items by category (product category or manual)
-        $itemsByCategory = [];
-        foreach ($pr->items as $item) {
-            $cat = 'Uncategorized';
-            if ($item->product && $item->product->category) {
-                $cat = $item->product->category;
-            } elseif ($item->manual_category) {
-                $cat = $item->manual_category;
-            } else {
-                 $cat = 'Lain-lain';
+        $budgetWarnings = [];
+
+        if ($pr->department->budget_type === \App\Enums\BudgetingType::JOB_COA) {
+             // Logic for Job Budget Warning in Show View
+             $itemsByJob = [];
+             foreach ($pr->items as $item) {
+                 if ($item->job) {
+                     $jobId = $item->job_id;
+                     $key = ($item->job->code ?? '') . ' - ' . $item->job->name;
+                     if (!isset($itemsByJob[$jobId])) $itemsByJob[$jobId] = ['amount'=>0, 'name'=>$key];
+                     $itemsByJob[$jobId]['amount'] += $item->subtotal;
+                 }
+             }
+
+             foreach ($itemsByJob as $jobId => $data) {
+                // Find Budget
+                $budget = \App\Models\Budget::where('sub_department_id', $subDeptId)
+                            ->where('job_id', $jobId)
+                            ->where('year', $year)
+                            ->first();
+
+                 $limit = $budget ? $budget->amount : 0;
+
+                 // Calculate Usage (Consumption)
+                 $otherUsed = $budget ? $budget->used_amount : 0;
+
+                 $totalProjected = $otherUsed + $data['amount'];
+                if ($totalProjected > $limit) {
+                    $budgetWarnings[] = "Budget <strong>{$data['name']}</strong> akan melebihi limit! (Limit: ".number_format($limit).", Terpakai+Request: ".number_format($totalProjected).")";
+                }
+             }
+
+        } else {
+            // Existing Station Logic
+            $itemsByCategory = [];
+            foreach ($pr->items as $item) {
+                $cat = 'Uncategorized';
+                if ($item->product && $item->product->category) {
+                    $cat = $item->product->category;
+                } elseif ($item->manual_category) {
+                    $cat = $item->manual_category;
+                } else {
+                     $cat = 'Lain-lain';
+                }
+
+                // NORMALIZE
+                if (in_array($cat, ['Material', 'material', 'Consumable', 'consumable', 'Bahan Pembantu'])) {
+                    $cat = 'Sparepart';
+                }
+
+                if (!isset($itemsByCategory[$cat])) $itemsByCategory[$cat] = 0;
+                $itemsByCategory[$cat] += $item->subtotal;
             }
-            if (!isset($itemsByCategory[$cat])) $itemsByCategory[$cat] = 0;
-            $itemsByCategory[$cat] += $item->subtotal;
+    
+            foreach ($itemsByCategory as $cat => $amount) {
+                $budget = \App\Models\Budget::where('sub_department_id', $subDeptId)
+                            ->where('category', $cat)
+                            ->where('year', $year)
+                            ->first();
+                
+                $limit = $budget ? $budget->amount : 0;
+                
+                $otherUsed = $budget ? $budget->used_amount : 0;
+                                
+                $totalProjected = $otherUsed + $amount;
+                
+                if ($totalProjected > $limit) {
+                    $budgetWarnings[] = "Budget <strong>{$cat}</strong> akan melebihi limit! (Limit: ".number_format($limit).", Terpakai+Request: ".number_format($totalProjected).")";
+                }
+            }
         }
 
-        $budgetWarnings = [];
-        foreach ($itemsByCategory as $cat => $amount) {
+        // --- Budget Info Logic (Mirrors PrPdfController) ---
+        $budgetInfo = [
+            'total' => 0,
+            'actual' => 0,
+            'current' => 0,
+            'saldo' => 0
+        ];
+
+        $isJobCoa = $pr->department->budget_type === \App\Enums\BudgetingType::JOB_COA;
+        
+        if ($isJobCoa) {
+             // Logic for Job Based PR (Single Job per PR constraint assumed)
+            $firstItem = $pr->items->first();
+            $jobId = $firstItem ? $firstItem->job_id : null;
+            
+            if ($jobId) {
+                $budget = \App\Models\Budget::where('sub_department_id', $subDeptId)
+                            ->where('job_id', $jobId)
+                            ->where('year', $year)
+                            ->first();
+                
+                $budgetInfo['total'] = $budget ? $budget->amount : 0;
+                $budgetInfo['actual'] = $budget ? $budget->used_amount : 0;
+            }
+        } else {
+             // Logic for Station Based PR (Focused on Sparepart Only)
+            $cat = 'Sparepart'; // Hardcoded as per user request
+            
             $budget = \App\Models\Budget::where('sub_department_id', $subDeptId)
                         ->where('category', $cat)
                         ->where('year', $year)
                         ->first();
-            
+
             $limit = $budget ? $budget->amount : 0;
+            $budgetInfo['total'] += $limit;
             
-            $otherUsed = \App\Models\PurchaseRequest::where('sub_department_id', $subDeptId)
-                            ->where('status', '!=', 'Rejected')
-                            ->where('id', '!=', $pr->id) // Exclude current
-                            ->whereYear('request_date', $year)
-                            ->with(['items' => function($q) use ($cat) {
-                                $q->whereHas('product', function($sq) use ($cat) {
-                                    $sq->where('category', $cat);
-                                })->orWhere('manual_category', $cat);
-                            }])
-                            ->get()
-                            ->sum(function($p) use ($cat) {
-                                return $p->items->filter(function($i) use ($cat) {
-                                    if ($i->product && $i->product->category === $cat) return true;
-                                    if ($i->manual_category === $cat) return true;
-                                    return false;
-                                })->sum('subtotal');
-                            });
-                            
-            $totalProjected = $otherUsed + $amount;
+            $otherUsed = $budget ? $budget->used_amount : 0;
+            $budgetInfo['actual'] += $otherUsed;
+        }
+
+        // Calculate current request based on displayed items
+        $budgetInfo['current'] = $pr->items->sum(function($item) {
+             return ($item->quantity) * $item->price_estimation; 
+        });
+
+        // RE-CALCULATE Current for correct 'Saldo' projection akin to PDF
+        $budgetInfo['saldo'] = $budgetInfo['total'] - ($budgetInfo['actual'] + $budgetInfo['current']);
+
+        // --- Fetch Stock for Items logic (RESTORED) ---
+        // Check if Department has a linked Warehouse
+        $warehouseId = $pr->department->warehouse_id;
+        
+        foreach ($pr->items as $item) {
+            $item->current_stock = 0; // Default
             
-            if ($totalProjected > $limit) {
-                $budgetWarnings[] = "Budget <strong>{$cat}</strong> akan minus! (Limit: ".number_format($limit).", Terpakai+Request: ".number_format($totalProjected).")";
+            if ($warehouseId && $item->product_id) {
+                $stock = \App\Models\WarehouseStock::where('warehouse_id', $warehouseId)
+                            ->where('product_id', $item->product_id)
+                            ->value('quantity');
+                
+                $item->current_stock = $stock ?? 0;
             }
         }
 
-        return view('pr.show', compact('pr', 'budgetWarnings'));
+        return view('pr.show', compact('pr', 'budgetWarnings', 'budgetInfo'));
     }
 
     public function getBudgetStatus($subDepartmentId)
@@ -277,41 +929,241 @@ class PrController extends Controller
         $year = date('Y'); // Current year
         $budgets = \App\Models\Budget::where('sub_department_id', $subDepartmentId)
                     ->where('year', $year)
-                    ->get()
-                    ->keyBy('category');
+                    ->get();
+        
+        // We need to know the Dept Budget Type, but here we just have subDeptId.
+        $subDept = \App\Models\SubDepartment::find($subDepartmentId);
+        if (!$subDept) return response()->json([]);
+        $isJobCoa = $subDept->department->budget_type === \App\Enums\BudgetingType::JOB_COA;
 
         $status = [];
-        $categories = config('options.product_categories');
-
-        foreach ($categories as $cat) {
-            $budgetAmount = $budgets[$cat]->amount ?? 0;
+        
+        if ($isJobCoa) {
+             foreach ($budgets as $budget) {
+                 if (!$budget->job) continue;
+                 $key = $budget->job_id;
+                 $label = ($budget->job->code ?? '') . ' - ' . $budget->job->name;
+                 // Usage
+                 // Usage (Consumption)
+                 $usedAmount = $budget->used_amount;
+                 
+                 $status[$label] = [ // Use Label as Key specifically for text display if needed, or ID
+                    'limit' => $budget->amount,
+                    'used' => $usedAmount,
+                    'remaining' => $budget->amount - $usedAmount
+                 ];
+             }
+        } else {
+            $categories = config('options.product_categories');
+            $budgetsByKey = $budgets->keyBy('category');
             
-            // Calculate usage
-            $usedAmount = \App\Models\PurchaseRequest::where('sub_department_id', $subDepartmentId)
-                            ->where('status', '!=', 'Rejected')
-                            ->whereYear('request_date', $year)
-                            ->with(['items' => function($q) use ($cat) {
-                                $q->whereHas('product', function($sq) use ($cat) {
-                                    $sq->where('category', $cat);
-                                })->orWhere('manual_category', $cat);
-                            }])
-                            ->get()
-                            ->sum(function($pr) use ($cat) {
-                                return $pr->items->filter(function($item) use ($cat) {
-                                    // Filter items belonging to this category
-                                    if ($item->product && $item->product->category === $cat) return true;
-                                    if ($item->manual_category === $cat) return true;
-                                    return false;
-                                })->sum('subtotal');
-                            });
-
-            $status[$cat] = [
-                'limit' => $budgetAmount,
-                'used' => $usedAmount,
-                'remaining' => $budgetAmount - $usedAmount
-            ];
+            foreach ($categories as $cat) {
+                $budgetAmount = $budgetsByKey[$cat]->amount ?? 0;
+                $usedAmount = $budgetsByKey[$cat]->used_amount ?? 0;
+    
+                $status[$cat] = [
+                    'limit' => $budgetAmount,
+                    'used' => $usedAmount,
+                    'remaining' => $budgetAmount - $usedAmount
+                ];
+            }
         }
 
         return response()->json($status);
+    }
+    
+    public function getJobs($subDepartmentId)
+    {
+        $year = date('Y');
+
+        $jobsByDirectBudget = DB::table('jobs')
+            ->join('budgets', 'jobs.id', '=', 'budgets.job_id')
+            ->where('budgets.sub_department_id', $subDepartmentId)
+            ->where('budgets.year', $year)
+            ->where('budgets.amount', '>', 0)
+            ->select('jobs.id', 'jobs.code', 'jobs.name');
+    
+        $jobsByCoaBudget = DB::table('jobs')
+            ->join('budgets', 'jobs.job_coa_id', '=', 'budgets.coa_id')
+            ->where('budgets.sub_department_id', $subDepartmentId)
+            ->where('budgets.year', $year)
+            ->where('budgets.amount', '>', 0)
+            ->select('jobs.id', 'jobs.code', 'jobs.name');
+    
+        $jobs = $jobsByDirectBudget
+            ->union($jobsByCoaBudget)
+            ->orderBy('code')
+            ->get();
+    
+        return response()->json($jobs);
+    }
+    
+    public function getJobsByDepartment(\App\Models\Department $department)
+    {
+        $year = date('Y');
+
+        // Fetch Job IDs that have an active budget for this department (either directly or via sub-departments)
+        $budgetJobIds = \App\Models\Budget::query()
+            ->where('year', $year)
+            ->where('amount', '>', 0)
+            ->where(function($q) use ($department) {
+                $q->where('department_id', $department->id)
+                  ->orWhereHas('subDepartment', function($sq) use ($department) {
+                      $sq->where('department_id', $department->id);
+                  });
+            })
+            ->pluck('job_id')
+            ->unique();
+        
+        $jobs = \App\Models\Job::whereIn('id', $budgetJobIds)
+                    ->orderBy('code')
+                    ->get();
+                    
+        return response()->json($jobs);
+    }
+
+    private function getJobsBySite($siteId)
+    {
+        $jobs = \App\Models\Job::where('site_id', $siteId)
+                ->orderBy('code')
+                ->get()
+                ->map(function($job) {
+                    return [
+                        'id' => $job->id,
+                        'name' => $job->name,
+                        'code' => $job->code,
+                        'label' => ($job->code ? $job->code . ' - ' : '') . $job->name
+                    ];
+                });
+                
+        return response()->json($jobs);
+    }
+
+    public function verifyCapexIndex()
+    {
+        $prs = \App\Models\PurchaseRequest::with(['department', 'user'])
+                ->where('is_capex', true)
+                ->where('status', \App\Enums\PrStatus::WAITING_VERIFICATION->value)
+                ->orderBy('created_at', 'asc')
+                ->get();
+
+        return view('admin.capex.index', compact('prs'));
+    }
+
+    public function verifyCapexStore(Request $request, \App\Models\PurchaseRequest $purchaseRequest)
+    {
+        $request->validate([
+            'capex_number' => 'required|string|max:10', // Changed validation: expecting short prefix (e.g. 01)
+        ]);
+
+        if (!$purchaseRequest->is_capex || $purchaseRequest->status !== \App\Enums\PrStatus::WAITING_VERIFICATION->value) {
+             return back()->with('error', 'PR Status Invalid for Verification.');
+        }
+        
+        $prefix = $request->capex_number;
+        $siteName = $purchaseRequest->department->site->name ?? 'HO'; 
+        
+        $month = date('n');
+        $romanMonth = $this->getRomanMonth($month);
+        $year = date('Y');
+        
+        $fullCapexNumber = sprintf("%s/Capex-%s/%s/%s", $prefix, $siteName, $romanMonth, $year);
+        
+        // Check Uniqueness manually since we construct it
+        if (\App\Models\PurchaseRequest::where('capex_number', $fullCapexNumber)->where('id', '!=', $purchaseRequest->id)->exists()) {
+            return back()->withErrors(['capex_number' => "Capex Number {$fullCapexNumber} already exists."]);
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function() use ($purchaseRequest, $fullCapexNumber) {
+             // 1. Update Capex Number & Status
+             $purchaseRequest->update([
+                 'capex_number' => $fullCapexNumber,
+                 'status' => \App\Enums\PrStatus::PENDING->value, // Move to Pending for Approval
+             ]);
+
+             // 2. Generate Approvals and Notify
+             app(\App\Services\PrService::class)->startApprovals($purchaseRequest);
+        });
+
+        return redirect()->route('admin.capex.index')->with('success', "PR {$purchaseRequest->pr_number} Verified with Capex No: {$fullCapexNumber}");
+    }
+    
+    private function getRomanMonth($month)
+    {
+        $map = [
+            1 => 'I', 2 => 'II', 3 => 'III', 4 => 'IV', 5 => 'V', 6 => 'VI',
+            7 => 'VII', 8 => 'VIII', 9 => 'IX', 10 => 'X', 11 => 'XI', 12 => 'XII'
+        ];
+        return $map[$month] ?? 'I';
+    }
+    
+    public function verifyCapexReject(Request $request, \App\Models\PurchaseRequest $purchaseRequest)
+    {
+        if (!$purchaseRequest->is_capex || $purchaseRequest->status !== \App\Enums\PrStatus::WAITING_VERIFICATION->value) {
+             return back()->with('error', 'PR Status Invalid for Verification Rejection.');
+        }
+
+        $purchaseRequest->update([
+             'status' => \App\Enums\PrStatus::REJECTED->value,
+        ]);
+        
+        return redirect()->route('admin.capex.index')->with('success', "PR {$purchaseRequest->pr_number} has been Rejected (CAPEX Verification Failed).");
+    }
+    
+    public function downloadAttachment(PurchaseRequest $purchaseRequest)
+    {
+        if (!$purchaseRequest->attachment_path) {
+            return back()->with('error', 'File attachment tidak ditemukan.');
+        }
+        
+        $filePath = storage_path('app/public/' . $purchaseRequest->attachment_path);
+        
+        if (!file_exists($filePath)) {
+            return back()->with('error', 'File tidak ditemukan di server. Path: ' . $purchaseRequest->attachment_path);
+        }
+        
+        $extension = pathinfo($purchaseRequest->attachment_path, PATHINFO_EXTENSION);
+        $safePrNumber = str_replace(['/', '\\'], '_', $purchaseRequest->pr_number);
+        $downloadName = $safePrNumber . '_attachment.' . $extension;
+        
+        return response()->download($filePath, $downloadName, [
+            'Content-Type' => mime_content_type($filePath),
+            'Content-Disposition' => 'attachment; filename="' . $downloadName . '"'
+        ]);
+    }
+
+    public function replyToHold(Request $request, PurchaseRequest $pr)
+    {
+        $user = auth()->user();
+
+        if ($pr->user_id !== $user->id) {
+            return back()->with('error', 'Anda tidak memiliki akses untuk membalas PR ini.');
+        }
+
+        if ($pr->status !== 'On Hold') {
+            return back()->with('error', 'PR tidak dalam status On Hold.');
+        }
+
+        $request->validate([
+            'hold_reply' => 'required|string|max:1000'
+        ]);
+
+        $holdApproval = $pr->approvals()
+            ->where('status', 'On Hold')
+            ->orderBy('level', 'desc')
+            ->first();
+
+        if (!$holdApproval) {
+            return back()->with('error', 'Approval On Hold tidak ditemukan.');
+        }
+
+        $holdApproval->update([
+            'hold_reply' => $request->hold_reply,
+            'replied_at' => now()
+        ]);
+
+        \Cache::forget('pr_current_approvers_*');
+
+        return back()->with('success', 'Balasan berhasil dikirim. Approver akan mereview kembali PR Anda.');
     }
 }

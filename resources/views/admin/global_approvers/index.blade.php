@@ -3,7 +3,7 @@
         <div class="flex justify-between items-center">
             <div>
                 <h2 class="text-2xl font-bold text-gray-800">Konfigurasi Approval Head Office</h2>
-                <p class="text-sm text-gray-500">Atur approver yang akan ditambahkan otomatis untuk departemen yang mewajibkan approval HO.</p>
+                <p class="text-sm text-gray-500">Atur approver yang akan ditambahkan otomatis untuk unit yang mewajibkan approval HO.</p>
             </div>
         </div>
 
@@ -15,11 +15,23 @@
                     @csrf
                     
                     <div>
+                        <x-input-label for="site_id" :value="__('Berlaku Untuk Site')" />
+                        <select id="site_id" name="site_id" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
+                            <option value="">-- Global (Semua Site) --</option>
+                            @foreach($sites as $site)
+                                <option value="{{ $site->id }}">{{ $site->name }} ({{ $site->code }})</option>
+                            @endforeach
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Biarkan kosong untuk Deputy/Direktur (berlaku nasional). Pilih Site khusus untuk Investor.</p>
+                        <x-input-error class="mt-2" :messages="$errors->get('site_id')" />
+                    </div>
+
+                    <div>
                         <x-input-label for="user_id" :value="__('User / Pejabat')" />
                         <select id="user_id" name="user_id" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
                             <option value="">Pilih User</option>
                             @foreach($users as $user)
-                                <option value="{{ $user->id }}">{{ $user->name }} - {{ $user->position }}</option>
+                                <option value="{{ $user->id }}">{{ $user->name }} - {{ $user->position }} @if($user->site) ({{ $user->site->code }}) @endif</option>
                             @endforeach
                         </select>
                         <x-input-error class="mt-2" :messages="$errors->get('user_id')" />
@@ -48,6 +60,7 @@
                     <thead class="bg-gray-50">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Level</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Scope</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
@@ -57,6 +70,17 @@
                         @forelse($approvers as $approver)
                             <tr>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $approver->level }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    @if($approver->site)
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                            Khusus: {{ $approver->site->code }}
+                                        </span>
+                                    @else
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                            Global (All)
+                                        </span>
+                                    @endif
+                                </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                     <div class="font-medium">{{ $approver->user->name }}</div>
                                     <div class="text-gray-500 text-xs">{{ $approver->user->email }}</div>

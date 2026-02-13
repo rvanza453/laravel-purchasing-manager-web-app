@@ -20,12 +20,15 @@ class PurchaseRequest extends Model
         'request_date',
         'description',
         'total_estimated_cost',
-        'sub_department_id'
+        'sub_department_id',
+        'is_capex',
+        'capex_number'
     ];
 
     protected $casts = [
         'request_date' => 'date',
         'total_estimated_cost' => 'decimal:2',
+        'is_capex' => 'boolean',
     ];
 
     public function user(): BelongsTo
@@ -52,9 +55,119 @@ class PurchaseRequest extends Model
     {
         return $this->hasMany(PrApproval::class)->orderBy('level');
     }
+    
+    public function purchaseOrders(): HasMany
+    {
+        return $this->hasMany(PurchaseOrder::class);
+    }
 
     public function purchaseOrder(): HasOne
     {
         return $this->hasOne(PurchaseOrder::class);
     }
+
+    public function getFinalTotalAttribute()
+    {
+        if ($this->status !== 'Approved') {
+            return $this->total_estimated_cost;
+        }
+
+        // Calculate sum of items with final approved quantities
+        return $this->items->sum(function ($item) {
+            return $item->getFinalQuantity() * $item->price_estimation;
+        });
+    }
+
+    /**
+     * Get the date when PR was fully approved
+     */
+    public function getApprovedAtAttribute()
+    {
+        if ($this->status !== 'Approved') {
+            return null;
+        }
+
+        // Get the latest approval record with status 'Approved'
+        $lastApproval = $this->approvals()
+                             ->where('status', 'Approved')
+                             ->orderBy('approved_at', 'desc')
+                             ->first();
+                             
+        // Fallback to updated_at if no approval record found (legacy data safety)
+        return $lastApproval ? $lastApproval->approved_at : $this->updated_at;
+    }
+
+    /**
+     * Check if PR is expired (more than 14 days since approval)
+     */
+    public function isExpired()
+    {
+        if ($this->status !== 'Approved') {
+            return false;
+        }
+        
+        $approvedAt = $this->approved_at;
+        if (!$approvedAt) return false;
+        
+        // Check if 14 days have passed
+        return $approvedAt->copy()->addDays(14)->isPast();
+    }
+
+    /**
+     * Get the PO generation status of the PR items
+     * Returns: 'Belum PO', 'Partial PO', 'Complete PO'
+     */
+    public function getPoStatusAttribute()
+    {
+        $totalItems = $this->items->count();
+        
+        if ($totalItems === 0) {
+            return 'Belum PO';
+        }
+
+        // Count items that have at least one related PO Item
+        $itemsWithPo = $this->items->filter(function ($item) {
+            return $item->poItems()->exists();
+        })->count();
+
+        if ($itemsWithPo === 0) {
+            return 'Waiting PO';
+        }
+
+        if ($itemsWithPo === $totalItems) {
+            return 'Complete PO';
+        }
+
+        return 'Partial PO';
+    }
+    
+    public function getCurrentApprover()
+    {
+        if ($this->status !== 'Pending' && $this->status !== 'On Hold') {
+            return null;
+        }
+
+        // Find the first pending approval (lowest level that hasn't been approved)
+        $pendingApproval = $this->approvals()
+            ->where('status', 'Pending')
+            ->orderBy('level')
+            ->first();
+
+        if (!$pendingApproval) {
+            return null;
+        }
+
+        // Check if all lower levels are approved
+        $lowerLevelsApproved = !$this->approvals()
+            ->where('level', '<', $pendingApproval->level)
+            ->where('status', '!=', 'Approved')
+            ->exists();
+
+        if ($lowerLevelsApproved) {
+            return $pendingApproval->approver;
+        }
+
+        return null;
+    }
 }
+

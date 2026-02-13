@@ -16,11 +16,18 @@
                     <x-input-error class="mt-2" :messages="$errors->get('name')" />
                 </div>
 
-                <!-- Email -->
                 <div>
                     <x-input-label for="email" :value="__('Email')" />
                     <x-text-input id="email" name="email" type="email" class="mt-1 block w-full" :value="old('email')" required />
                     <x-input-error class="mt-2" :messages="$errors->get('email')" />
+                </div>
+
+                <!-- Phone Number -->
+                <div>
+                     <x-input-label for="phone_number" :value="__('No. WhatsApp / HP')" />
+                     <p class="text-xs text-gray-500 mb-1">Format: 08123xxx atau 628123xxx</p>
+                     <x-text-input id="phone_number" name="phone_number" type="text" class="mt-1 block w-full" :value="old('phone_number')" />
+                     <x-input-error class="mt-2" :messages="$errors->get('phone_number')" />
                 </div>
 
                 <!-- Role -->
@@ -49,9 +56,9 @@
 
                 <!-- Department -->
                 <div>
-                    <x-input-label for="department_id" :value="__('Departemen')" />
+                    <x-input-label for="department_id" :value="__('Unit')" />
                     <select id="department_id" name="department_id" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
-                        <option value="">Pilih Departemen (Opsional)</option>
+                        <option value="">Pilih Unit (Opsional)</option>
                         @foreach($departments as $dept)
                             <option value="{{ $dept->id }}" {{ old('department_id') == $dept->id ? 'selected' : '' }}>{{ $dept->name }}</option>
                         @endforeach
@@ -97,7 +104,7 @@
         const deptSelect = document.getElementById('department_id');
         
         // Reset dropdown
-        deptSelect.innerHTML = '<option value="">Pilih Departemen (Opsional)</option>';
+        deptSelect.innerHTML = '<option value="">Pilih Unit (Opsional)</option>';
         
         if (siteId) {
             fetch(`/api/sites/${siteId}/departments`)

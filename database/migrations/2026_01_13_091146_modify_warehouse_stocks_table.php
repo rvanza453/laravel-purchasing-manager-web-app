@@ -46,13 +46,19 @@ return new class extends Migration
         // We assume integrity is good.
 
         Schema::table('warehouse_stocks', function (Blueprint $table) {
-             // We need to drop the composite unique key involving site_id first if it exists
-             // The original migration had: $table->unique(['product_id', 'site_id']);
+             // We need to drop the composite unique key involving site_id first
+             // But first, we must drop FKs relying on it.
+             // product_id FK relies on the unique index (product_id, site_id).
+             $table->dropForeign(['product_id']);
+             $table->dropForeign(['site_id']);
+
              $table->dropUnique(['product_id', 'site_id']);
              
-             $table->dropForeign(['site_id']);
              $table->dropColumn('site_id');
              
+             // Restore product_id foreign key
+             $table->foreign('product_id')->references('id')->on('products')->cascadeOnDelete();
+
              // Now make warehouse_id required
              $table->unsignedBigInteger('warehouse_id')->nullable(false)->change();
              

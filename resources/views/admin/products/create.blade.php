@@ -1,12 +1,10 @@
 <x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('Add New Product') }}
-        </h2>
-    </x-slot>
-
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            <h2 class="font-semibold text-xl text-gray-800 leading-tight mb-6">
+                {{ __('Add New Product') }}
+            </h2>
+
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
                     <form method="POST" action="{{ route('products.store') }}" class="space-y-6 max-w-xl">
@@ -49,6 +47,27 @@
                                 <x-text-input id="price_estimation" class="block mt-1 w-full" type="number" name="price_estimation" :value="old('price_estimation', 0)" min="0" step="0.01" />
                                 <x-input-error :messages="$errors->get('price_estimation')" class="mt-2" />
                             </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-gray-700 font-bold mb-2">Tersedia di Site:</label>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                @foreach($sites as $site)
+                                    <label class="inline-flex items-center space-x-2">
+                                        <input type="checkbox" 
+                                               name="sites[]" 
+                                               value="{{ $site->id }}"
+                                               class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                                               {{-- Logika untuk Edit: Jika produk punya relasi ke site ini, centang --}}
+                                               @if(isset($product) && $product->sites->contains($site->id)) checked @endif
+                                        >
+                                        <span class="text-sm text-gray-700">{{ $site->name }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                            @error('sites')
+                                <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                            @enderror
                         </div>
 
                         <div>

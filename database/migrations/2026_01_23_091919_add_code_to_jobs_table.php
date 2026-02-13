@@ -11,18 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('pr_items', function (Blueprint $table) {
-            //
+        Schema::table('jobs', function (Blueprint $table) {
+            $table->string('code')->nullable()->after('site_id');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::table('pr_items', function (Blueprint $table) {
-            //
+        Schema::table('jobs', function (Blueprint $table) {
+            $table->dropColumn('code');
         });
     }
 };

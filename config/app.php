@@ -58,6 +58,18 @@ return [
     'url' => env('APP_URL', 'http://localhost'),
 
     'asset_url' => env('ASSET_URL'),
+    
+    /*
+    |--------------------------------------------------------------------------
+    | Admin Verification Password
+    |--------------------------------------------------------------------------
+    |
+    | This password is used to verify sensitive admin actions like impersonation,
+    | deleting warehouses, and deleting products. Set this in your .env file.
+    |
+    */
+
+    'admin_verification_password' => env('ADMIN_VERIFICATION_PASSWORD', 'tukangkebun123'),
 
     /*
     |--------------------------------------------------------------------------
@@ -70,7 +82,7 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => 'Asia/Jakarta',
 
     /*
     |--------------------------------------------------------------------------

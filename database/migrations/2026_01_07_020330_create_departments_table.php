@@ -13,6 +13,7 @@ return new class extends Migration
             $table->foreignId('site_id')->constrained('sites')->cascadeOnDelete();
             $table->string('name'); // e.g. HRD, Teknik
             $table->string('code')->index(); 
+            $table->boolean('use_global_approval')->default(false);
             $table->timestamps();
             
             $table->unique(['site_id', 'code']);

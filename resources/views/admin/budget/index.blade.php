@@ -48,7 +48,7 @@
                                 <div>
                                     <h3 class="text-lg font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{{ $s->name }}</h3>
                                     <p class="text-sm font-semibold text-indigo-600">Rp {{ number_format($s->total_budget, 0, ',', '.') }}</p>
-                                    <p class="text-xs text-gray-500">{{ $s->dept_count }} Departemen</p>
+                                    <p class="text-xs text-gray-500">{{ $s->dept_count }} Unit</p>
                                 </div>
                             </div>
                         </div>
@@ -59,7 +59,10 @@
             {{-- Level 2: Department List --}}
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 @foreach($departments as $d)
-                    <a href="{{ route('admin.budgets.index', ['site_id' => $site->id, 'department_id' => $d->id]) }}" class="group bg-white p-6 rounded-xl shadow-sm border border-transparent hover:border-indigo-500 hover:shadow-md transition-all duration-200">
+                    <a href="{{ $d->budget_type === \App\Enums\BudgetingType::JOB_COA 
+                        ? route('admin.budgets.edit-department', $d) 
+                        : route('admin.budgets.index', ['site_id' => $site->id, 'department_id' => $d->id]) 
+                    }}" class="group bg-white p-6 rounded-xl shadow-sm border border-transparent hover:border-indigo-500 hover:shadow-md transition-all duration-200">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-4">
                                 <div class="p-3 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
@@ -68,7 +71,11 @@
                                 <div>
                                     <h3 class="text-lg font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{{ $d->name }}</h3>
                                     <p class="text-sm font-semibold text-indigo-600">Rp {{ number_format($d->total_budget, 0, ',', '.') }}</p>
-                                    <p class="text-xs text-gray-500">{{ $d->subDepartments->count() }} Sub Departemen</p>
+                                    @if($d->budget_type === \App\Enums\BudgetingType::JOB_COA)
+                                        <p class="text-xs text-gray-500">Budget Unit / Job</p>
+                                    @else
+                                        <p class="text-xs text-gray-500">{{ $d->subDepartments->count() }} Stasiun / Afdeling</p>
+                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -76,37 +83,59 @@
                 @endforeach
             </div>
         @else
-            {{-- Level 3: Sub Department List Table --}}
-            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sub Departemen</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total Budget Configured</th>
-                            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        @forelse($subDepartments as $sub)
-                            <tr class="hover:bg-gray-50 transition-colors">
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800">{{ $sub->name }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold text-indigo-600">
-                                    Rp {{ number_format($sub->budgets->sum('amount'), 0, ',', '.') }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                                    <a href="{{ route('admin.budgets.edit', $sub) }}" class="inline-flex items-center px-3 py-1 bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 transition-colors">
-                                        Manage Budget
-                                    </a>
-                                </td>
-                            </tr>
-                        @empty
+            {{-- Level 3: Sub Department List Table OR Department Level Management --}}
+            
+            @if(isset($department) && $department->budget_type === \App\Enums\BudgetingType::JOB_COA)
+                <div class="bg-white rounded-xl shadow-sm overflow-hidden p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">Budget Unit / Job Configuration</h3>
+                            <p class="text-gray-500 text-sm mt-1">Manage budget limits for this Unit directly (per Job).</p>
+                        </div>
+                        <div class="text-right">
+                             <p class="text-sm font-semibold text-gray-500">Total Budget</p>
+                             <p class="text-xl font-bold text-indigo-600">Rp {{ number_format($department->budgets->sum('amount'), 0, ',', '.') }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6 border-t pt-6">
+                        <a href="{{ route('admin.budgets.edit-department', $department) }}" class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 focus:bg-indigo-700 active:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                            Manage Unit Budget
+                        </a>
+                    </div>
+                </div>
+            @else
+                <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
                             <tr>
-                                <td colspan="3" class="px-6 py-4 text-center text-gray-500">Belum ada sub departemen di departemen ini.</td>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stasiun / Afdeling</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total Budget Configured</th>
+                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
                             </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            @forelse($subDepartments as $sub)
+                                <tr class="hover:bg-gray-50 transition-colors">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800">{{ $sub->name }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold text-indigo-600">
+                                        Rp {{ number_format($sub->budgets->sum('amount'), 0, ',', '.') }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                                        <a href="{{ route('admin.budgets.edit', $sub) }}" class="inline-flex items-center px-3 py-1 bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 transition-colors">
+                                            Manage Budget
+                                        </a>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="3" class="px-6 py-4 text-center text-gray-500">Belum ada Stasiun / afdeling di unit ini.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            @endif
         @endif
     </div>
 </x-app-layout>

@@ -11,7 +11,7 @@
                     <button @click="open = !open" class="w-full flex justify-between items-center px-6 py-4 bg-gray-50 hover:bg-gray-100 transition-colors border-b border-gray-200">
                         <div class="flex items-center gap-2">
                             <span class="font-bold text-gray-800 text-lg">{{ $siteName }}</span>
-                            <span class="bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full text-xs font-medium">{{ $siteDepts->count() }} Departemen</span>
+                            <span class="bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full text-xs font-medium">{{ $siteDepts->count() }} Unit</span>
                         </div>
                         <svg class="w-4 h-4 text-gray-400 transform transition-transform duration-200" style="width: 16px; height: 16px;" :class="{'rotate-180': open, 'rotate-0': !open}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
@@ -20,8 +20,9 @@
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-white">
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-1/4">Nama Departemen</th>
-                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-1/6">Kode</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-1/4">Nama Unit</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-1/6">COA</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-1/6">Budget Type</th>
                                     <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-1/2">Approver Config</th>
                                     <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-1/6">Aksi</th>
                                 </tr>
@@ -30,13 +31,24 @@
                                 @foreach($siteDepts as $department)
                                     <tr class="hover:bg-gray-50 transition-colors">
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $department->name }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $department->code }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $department->coa }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            @if(($department->budget_type instanceof \App\Enums\BudgetingType ? $department->budget_type->value : $department->budget_type) === 'job_coa')
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                    Per Pekerjaan (Job)
+                                                </span>
+                                            @else
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                    Per Station
+                                                </span>
+                                            @endif
+                                        </td>
                                         <td class="px-6 py-4 text-sm text-gray-500">
                                             @foreach($department->approverConfigs as $config)
                                                 <div class="flex items-center gap-2 mb-1">
                                                     <span class="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded border border-gray-200">Lvl {{ $config->level }}</span>
                                                     <span class="text-gray-700 font-medium">{{ $config->role_name }}</span>
-                                                    <span class="text-gray-500 text-xs">({{ $config->user->name }})</span>
+                                                    <span class="text-gray-500 text-xs">({{ $config->user->name ?? 'User Deleted' }})</span>
                                                 </div>
                                             @endforeach
             
@@ -69,7 +81,7 @@
                 </div>
             @empty
                 <div class="bg-white rounded-xl shadow-sm p-10 text-center text-gray-500">
-                    Belum ada departemen.
+                    Belum ada unit.
                 </div>
             @endforelse
         </div>

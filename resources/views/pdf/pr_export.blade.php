@@ -279,7 +279,26 @@
     <!-- Header -->
     <div class="header">
         <div class="header-left">
-            <img src="{{ public_path('images/saraswantiLogo.png') }}" alt="Saraswanti Logo">
+            @php
+                // 1. Definisikan path file secara internal (Server Path)
+                $path = public_path('images/saraswantiLogo.png');
+                
+                $logoData = null;
+
+                // 2. Cek apakah file benar-benar ada di server
+                if (file_exists($path)) {
+                    // 3. Baca file dan ubah ke Base64
+                    $type = pathinfo($path, PATHINFO_EXTENSION);
+                    $data = file_get_contents($path);
+                    $logoData = 'data:image/' . $type . ';base64,' . base64_encode($data);
+                }
+            @endphp
+
+            @if($logoData)
+                <img src="{{ $logoData }}" alt="Logo" class="logo">
+            @else
+                <span style="color:red; font-size:8px;">Logo file not found at: {{ $path }}</span>
+            @endif
         </div>
         <div class="header-center">
             <h1>LEMBAR PERMINTAAN PEMBELIAN BARANG</h1>
@@ -303,7 +322,7 @@
                 </tr>
                 <tr>
                     <td class="label">Jenis/Pekerjaan/Unit/Stadium/Kategori</td>
-                    <td class="value">: {{ ($pr->department->name ?? '-') . ' / ' . ($pr->subDepartment->name ?? '-') }}</td>
+                    <td class="value">: {{ $jobName }}</td>
                 </tr>
                 <tr>
                     <td class="label">No. PP</td>
@@ -411,19 +430,13 @@
                 <td class="text-right">{{ number_format($pengajuanPrice, 0, ',', '.') }}</td>
                 <td class="text-center">{{ $finalQty }}</td>
                 <td class="text-right">{{ number_format($totalPrice, 0, ',', '.') }}</td>
-                <td>-</td>
+                <td>{{ $item->remarks ?? '-' }}</td>
             </tr>
             @endforeach
             
-            <tr class="total-row">
-                <td colspan="{{ 10 + count($hoApprovals) }}" class="text-right">Total Anggaran: Rp {{ number_format($budgetInfo['total'], 0, ',', '.') }}</td>
-                <td colspan="2"></td>
-            </tr>
             <tr>
-                <td colspan="{{ 10 + count($hoApprovals) }}" class="text-right" style="font-size: 7pt;">
-                    Actual: Rp {{ number_format($budgetInfo['actual'], 0, ',', '.') }} | 
-                    Permintaan: Rp {{ number_format($budgetInfo['current'], 0, ',', '.') }} | 
-                    Saldo: Rp {{ number_format($budgetInfo['saldo'], 0, ',', '.') }}
+                <td colspan="{{ (10) + count($hoApprovals) }}" class="text-right" style="font-weight: bold;">
+                    Total Harga yang disetujui : Rp {{ number_format($totalPrice, 0, ',', '.') }}
                 </td>
                 <td colspan="2"></td>
             </tr>
@@ -476,7 +489,7 @@
         <!-- Row 2: HO Approvals (Disetujui Oleh) -->
         <div style="width: 100%;">
             <div style="text-align: center; margin-bottom: 10px; font-weight: bold; font-size: 8pt;">Disetujui Oleh,</div>
-            <table style="width: 100%; border-collapse: collapse;">
+            <table style="width: 100%; border-collapse: collapse;  margin-top: 10px;">
                 <tr>
                 @foreach($hoApprovals->sortBy('level') as $approval)
                     <td style="width: {{ 100 / max(count($hoApprovals), 1) }}%; text-align: center; vertical-align: top; padding: 2px; font-size: 6pt;">
@@ -484,7 +497,6 @@
                             $config = \App\Models\GlobalApproverConfig::where('user_id', $approval->approver_id)->first();
                             $roleToDisplay = $config ? $config->role_name : $approval->role_name;
                         @endphp
-                        <div class="signature-role" style="margin-bottom: 5px;">{{ $roleToDisplay }}</div>
                         <div style="height: 55px; position: relative;">
                             <div class="signature-img-container">
                                     @if($approval->approver->signature_path)

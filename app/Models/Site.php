@@ -12,6 +12,12 @@ class Site extends Model
 
     protected $fillable = ['name', 'code', 'location'];
 
+    public function products()
+    {
+        return $this->belongsToMany(Product::class, 'product_site', 'site_id', 'product_id')
+                    ->withTimestamps();
+    }
+    
     public function departments(): HasMany
     {
         return $this->hasMany(Department::class);

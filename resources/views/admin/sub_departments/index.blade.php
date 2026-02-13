@@ -20,7 +20,7 @@
                                 <tr>
                                     <th class="px-6 py-3">Department</th>
                                     <th class="px-6 py-3">Sub Department Name</th>
-                                    <th class="px-6 py-3">Code</th>
+                                    <th class="px-6 py-3">COA</th>
                                     <th class="px-6 py-3 text-center">Actions</th>
                                 </tr>
                             </thead>
@@ -29,7 +29,7 @@
                                     <tr class="bg-white border-b hover:bg-gray-50">
                                         <td class="px-6 py-4 font-medium text-gray-900">{{ $sub->department->name }}</td>
                                         <td class="px-6 py-4">{{ $sub->name }}</td>
-                                        <td class="px-6 py-4">{{ $sub->code ?? '-' }}</td>
+                                        <td class="px-6 py-4">{{ $sub->coa ?? '-' }}</td>
                                         <td class="px-6 py-4 text-center space-x-2">
                                             <a href="{{ route('sub-departments.edit', $sub) }}" class="text-blue-600 hover:text-blue-900">Edit</a>
                                             <form action="{{ route('sub-departments.destroy', $sub) }}" method="POST" class="inline" onsubmit="return confirm('Are you sure?')">

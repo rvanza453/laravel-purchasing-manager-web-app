@@ -12,9 +12,18 @@ class GlobalApproverController extends Controller
      */
     public function index()
     {
-        $approvers = \App\Models\GlobalApproverConfig::with('user')->orderBy('level')->get();
-        $users = \App\Models\User::orderBy('name')->get();
-        return view('admin.global_approvers.index', compact('approvers', 'users'));
+        $approvers = \App\Models\GlobalApproverConfig::with(['user', 'site'])->orderBy('level')->get();
+        // Only show users from HO site (or all users if needed, HO is safer for global approvers usually, but Investor might be from anywhere?)
+        // Let's allow all users for flexibility, or keep HO. Current logic keeps HO.
+        // The investor might strictly be an external party not in "HO" site in the system? 
+        // Checks: $users query filters by HO. 
+        // If investor is created as a user, they might be assigned to a specific site or HO. 
+        // Safest is to allow ALL users to be picked as Global Approver.
+        $users = \App\Models\User::orderBy('name')->get(); 
+        
+        $sites = \App\Models\Site::orderBy('name')->get();
+        
+        return view('admin.global_approvers.index', compact('approvers', 'users', 'sites'));
     }
 
     public function store(Request $request)
@@ -22,7 +31,8 @@ class GlobalApproverController extends Controller
         $request->validate([
             'user_id' => 'required|exists:users,id',
             'role_name' => 'required|string',
-            'level' => 'required|integer|unique:global_approver_configs,level',
+            'level' => 'required|integer', // Removed unique constraint
+            'site_id' => 'nullable|exists:sites,id',
         ]);
 
         \App\Models\GlobalApproverConfig::create($request->all());

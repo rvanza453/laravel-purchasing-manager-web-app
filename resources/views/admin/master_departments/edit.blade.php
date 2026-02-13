@@ -1,7 +1,7 @@
 <x-app-layout>
     <div class="max-w-2xl mx-auto space-y-6">
         <div class="flex justify-between items-center">
-            <h2 class="text-2xl font-bold text-gray-800">Edit Departemen (Master Data)</h2>
+            <h2 class="text-2xl font-bold text-gray-800">Edit Unit (Master Data)</h2>
             <a href="{{ route('master-departments.index') }}" class="text-gray-600 hover:text-gray-900">Kembali</a>
         </div>
 
@@ -22,15 +22,27 @@
                     </div>
 
                     <div class="mb-4">
-                        <x-input-label for="name" value="Nama Departemen" />
+                        <x-input-label for="name" value="Nama Unit" />
                         <x-text-input id="name" class="block mt-1 w-full" type="text" name="name" :value="old('name', $department->name)" required />
                         <x-input-error :messages="$errors->get('name')" class="mt-2" />
                     </div>
 
+                    <div class="mb-4">
+                        <x-input-label for="warehouse_id" value="Warehouse (Gudang) - Optional" />
+                        <select id="warehouse_id" name="warehouse_id" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                            <option value="">-- Tidak Terhubung ke Gudang --</option>
+                            @foreach($warehouses as $warehouse)
+                                <option value="{{ $warehouse->id }}" {{ $department->warehouse_id == $warehouse->id ? 'selected' : '' }}>{{ $warehouse->name }}</option>
+                            @endforeach
+                        </select>
+                         <div class="text-xs text-gray-500 mt-1">Pilih gudang jika unit ini memiliki stok fisik yang perlu ditampilkan di PR.</div>
+                         <x-input-error :messages="$errors->get('warehouse_id')" class="mt-2" />
+                    </div>
+
                     <div class="mb-4 col-span-2">
-                        <x-input-label for="code" value="Kode" />
-                        <x-text-input id="code" class="block mt-1 w-full" type="text" name="code" :value="old('code', $department->code)" required />
-                         <x-input-error :messages="$errors->get('code')" class="mt-2" />
+                        <x-input-label for="coa" value="COA" />
+                        <x-text-input id="coa" class="block mt-1 w-full" type="text" name="coa" :value="old('coa', $department->coa)" required />
+                         <x-input-error :messages="$errors->get('coa')" class="mt-2" />
                     </div>
                 </div>
 
@@ -44,7 +56,7 @@
             {{-- Sub Departments Section --}}
             <div class="mt-8 border-t border-gray-100 pt-6">
                 <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-semibold text-gray-700">Sub Departemen (Afdeling)</h3>
+                    <h3 class="text-lg font-semibold text-gray-700">Stasiun (Afdeling)</h3>
                     <button type="button" onclick="showSubDeptModal()" class="text-sm text-primary-600 hover:text-primary-700 font-medium">+ Tambah Sub Dept</button>
                 </div>
 
@@ -54,7 +66,7 @@
                             <thead class="bg-gray-100">
                                 <tr>
                                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nama</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Kode</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">COA</th>
                                     <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Aksi</th>
                                 </tr>
                             </thead>
@@ -62,7 +74,7 @@
                                 @foreach($department->subDepartments as $sub)
                                     <tr>
                                         <td class="px-4 py-2 text-sm text-gray-900">{{ $sub->name }}</td>
-                                        <td class="px-4 py-2 text-sm text-gray-500">{{ $sub->code ?? '-' }}</td>
+                                        <td class="px-4 py-2 text-sm text-gray-500">{{ $sub->coa ?? '-' }}</td>
                                         <td class="px-4 py-2 text-right text-sm font-medium">
                                             <form action="{{ route('sub-departments.destroy', $sub) }}" method="POST" class="inline-block" onsubmit="return confirm('Hapus sub department ini?')">
                                                 @csrf
@@ -76,7 +88,7 @@
                         </table>
                     </div>
                 @else
-                    <p class="text-sm text-gray-500 italic">Belum ada Sub Departemen.</p>
+                    <p class="text-sm text-gray-500 italic">Belum ada Stasiun / Afdeling.</p>
                 @endif
             </div>
         </div>
@@ -105,15 +117,15 @@
                     <input type="hidden" name="redirect_back" value="1"> {{-- Signal to controller --}}
                     
                     <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">Tambah Sub Departemen</h3>
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">Tambah Stasiun / Afdeling</h3>
                         <div class="mt-2 space-y-4">
                             <div>
-                                <label for="sub_name" class="block text-sm font-medium text-gray-700">Nama Sub Departemen</label>
+                                <label for="sub_name" class="block text-sm font-medium text-gray-700">Nama Stasiun / Afdeling</label>
                                 <input type="text" name="name" id="sub_name" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" required>
                             </div>
                             <div>
-                                <label for="sub_code" class="block text-sm font-medium text-gray-700">Kode (Opsional)</label>
-                                <input type="text" name="code" id="sub_code" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
+                                <label for="sub_coa" class="block text-sm font-medium text-gray-700">COA (Opsional)</label>
+                                <input type="text" name="coa" id="sub_coa" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
                             </div>
                         </div>
                     </div>

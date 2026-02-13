@@ -18,17 +18,17 @@ class PrApproval extends Model
         'status',
         'approved_at',
         'remarks',
-        'adjusted_quantities'
+        'adjusted_quantities',
+        'hold_reply',
+        'replied_at'
     ];
 
     protected $casts = [
         'approved_at' => 'datetime',
+        'replied_at' => 'datetime',
         'adjusted_quantities' => 'array',
     ];
 
-    /**
-     * Get adjusted quantity for a specific item
-     */
     public function getAdjustedQuantityForItem($itemId)
     {
         if (!$this->adjusted_quantities) {

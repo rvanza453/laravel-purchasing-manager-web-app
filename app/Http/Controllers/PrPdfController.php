@@ -15,78 +15,77 @@ class PrPdfController extends Controller
             abort(403, 'PR belum fully approved. Export PDF hanya tersedia untuk PR yang sudah disetujui semua.');
         }
 
-        // Load relations
         $purchaseRequest->load([
             'user',
             'department.site',
             'subDepartment',
             'items.product',
+            'items.job',
             'approvals' => function ($query) {
                 $query->where('status', 'Approved')
                       ->with('approver')
                       ->orderBy('level');
             }
         ]);
-
-        // Calculate budget information
+        
         $year = $purchaseRequest->request_date->format('Y');
         $subDeptId = $purchaseRequest->sub_department_id;
-        
-        // Group items by category
-        $itemsByCategory = [];
-        foreach ($purchaseRequest->items as $item) {
-            $cat = 'Lain-lain';
-            if ($item->product && $item->product->category) {
-                $cat = $item->product->category;
-            } elseif ($item->manual_category) {
-                $cat = $item->manual_category;
-            }
-            if (!isset($itemsByCategory[$cat])) $itemsByCategory[$cat] = 0;
-            $itemsByCategory[$cat] += $item->subtotal;
-        }
+        $dept = $purchaseRequest->department;
 
-        // Calculate budget totals
+        $isJobCoa = $dept->budget_type === \App\Enums\BudgetingType::JOB_COA;
+        $subDept = $purchaseRequest->subDepartment;
+        $subDeptName = $subDept ? ($subDept->coa ? $subDept->coa . ' - ' : '') . $subDept->name : '-';
+        
+        $jobName = ($dept->name ?? '-') . ' / ' . $subDeptName;
+        
         $totalBudget = 0;
         $totalActual = 0;
-        
-        foreach ($itemsByCategory as $cat => $amount) {
-            $budget = \App\Models\Budget::where('sub_department_id', $subDeptId)
-                        ->where('category', $cat)
+
+        if ($isJobCoa) {
+            // Logic for Job Based PR
+            // Assuming single job per PR as enforced in Create
+            $firstItem = $purchaseRequest->items->first();
+            $jobId = $firstItem ? $firstItem->job_id : null;
+            
+            if ($jobId) {
+                $job = \App\Models\Job::find($jobId);
+                if ($job) {
+                    $jobName .= ' / ' . ($job->code ? $job->code . ' - ' : '') . $job->name;
+                    
+                    // Specific Job Budget
+                    $budget = \App\Models\Budget::where('sub_department_id', $subDeptId)
+                                ->where('job_id', $jobId)
+                                ->where('year', $year)
+                                ->first();
+                    
+                    $totalBudget = $budget ? $budget->amount : 0;
+                    
+                    // FIXED: Use Budget->used_amount (Inventory Out) instead of summing PRs
+                    $totalActual = $budget ? $budget->used_amount : 0;
+                }
+            }
+        } else {
+            
+            $budgets = \App\Models\Budget::where('sub_department_id', $subDeptId)
                         ->where('year', $year)
-                        ->first();
+                        ->get();
+
+            $totalBudget = $budgets->sum('amount');
             
-            $limit = $budget ? $budget->amount : 0;
-            $totalBudget += $limit;
-            
-            // Calculate actual (other approved PRs, excluding current)
-            $otherUsed = \App\Models\PurchaseRequest::where('sub_department_id', $subDeptId)
-                            ->where('status', 'Approved')
-                            ->where('id', '!=', $purchaseRequest->id)
-                            ->whereYear('request_date', $year)
-                            ->with(['items' => function($q) use ($cat) {
-                                $q->whereHas('product', function($sq) use ($cat) {
-                                    $sq->where('category', $cat);
-                                })->orWhere('manual_category', $cat);
-                            }])
-                            ->get()
-                            ->sum(function($p) use ($cat) {
-                                return $p->items->filter(function($i) use ($cat) {
-                                    if ($i->product && $i->product->category === $cat) return true;
-                                    if ($i->manual_category === $cat) return true;
-                                    return false;
-                                })->sum('subtotal');
-                            });
-                            
-            $totalActual += $otherUsed;
+            $totalActual = $budgets->sum('used_amount');
         }
         
-        $currentRequest = $purchaseRequest->total_estimated_cost;
+        $currentRequest = $purchaseRequest->items->sum(function($item) {
+            return $item->getFinalQuantity() * $item->price_estimation;
+        });
+        
         $saldo = $totalBudget - ($totalActual + $currentRequest);
 
         // Generate PDF
         $pdf = Pdf::loadView('pdf.pr_export', [
             'pr' => $purchaseRequest,
             'approvals' => $purchaseRequest->approvals,
+            'jobName' => $jobName,
             'budgetInfo' => [
                 'total' => $totalBudget,
                 'actual' => $totalActual,

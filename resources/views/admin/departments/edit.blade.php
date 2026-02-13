@@ -17,8 +17,8 @@
                         <span class="font-semibold text-gray-800">{{ $department->site->name }}</span>
                     </div>
                     <div>
-                        <span class="block text-xs font-medium text-gray-500 uppercase">Kode Departemen</span>
-                        <span class="font-semibold text-gray-800">{{ $department->code }}</span>
+                        <span class="block text-xs font-medium text-gray-500 uppercase">COA</span>
+                        <span class="font-semibold text-gray-800">{{ $department->coa }}</span>
                     </div>
                 </div>
 
@@ -28,6 +28,19 @@
                         <span class="ml-2 text-sm text-gray-600">{{ __('Wajib Approval HO (Head Office)') }}</span>
                     </label>
                     <p class="text-xs text-gray-500 ml-6">Jika dicentang, akan otomatis meminta approval ke tim HO setelah approval lokal selesai.</p>
+                </div>
+
+                <div class="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-100">
+                    <x-input-label for="budget_type" value="Tipe Budgeting" class="text-blue-800" />
+                    <select id="budget_type" name="budget_type" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                        <option value="station" {{ ($department->budget_type instanceof \App\Enums\BudgetingType ? $department->budget_type->value : $department->budget_type) === 'station' ? 'selected' : '' }}>Per Station</option>
+                        <option value="job_coa" {{ ($department->budget_type instanceof \App\Enums\BudgetingType ? $department->budget_type->value : $department->budget_type) === 'job_coa' ? 'selected' : '' }}>Per Pekerjaan (Job)</option>
+                    </select>
+                    <x-input-error :messages="$errors->get('budget_type')" class="mt-2" />
+                    <div class="mt-2 text-xs text-gray-600 space-y-1">
+                        <p><b>Per Station:</b> Budget diatur per Station (Detail alokasi per kategori barang).</p>
+                        <p><b>Per Pekerjaan (Job):</b> Budget diatur berdasarkan kode pekerjaan spesifik (Misal: 5.1.1.2 - Panen).</p>
+                    </div>
                 </div>
 
                 {{-- Approver Config Section --}}
@@ -73,3 +86,45 @@
     </div>
 
 </x-app-layout>
+
+<script>
+    let approverIndex = {{ $department->approverConfigs->count() }};
+    const users = @json($users);
+
+    function addApprover() {
+        const container = document.getElementById('approver-container');
+        const index = approverIndex++;
+        
+        let userOptions = '<option value="">Pilih User</option>';
+        users.forEach(user => {
+            userOptions += `<option value="${user.id}">${user.name} (${user.email})</option>`;
+        });
+
+        // Determine next level automatically (simple heuristic: max existing level + 1, or just count + 1)
+        // Let's just default to current count + 1
+        const level = document.querySelectorAll('.approver-row').length + 1;
+
+        const row = `
+            <div class="grid grid-cols-12 gap-2 approver-row bg-gray-50 p-3 rounded-lg animate-fade-in-down">
+                <div class="col-span-2 flex items-center">
+                    <span class="text-sm font-bold text-gray-500">Level <input type="number" name="approvers[${index}][level]" value="${level}" class="w-16 h-8 text-sm p-1 border-gray-300 rounded focus:border-primary-500 focus:ring-primary-500"></span>
+                </div>
+                <div class="col-span-4">
+                        <input type="text" name="approvers[${index}][role_name]" placeholder="Nama Jabatan (misal: Manager)" class="block w-full border-gray-300 rounded-md shadow-sm text-sm p-1.5 focus:border-primary-500 focus:ring-primary-500" required>
+                </div>
+                <div class="col-span-5">
+                    <select name="approvers[${index}][user_id]" class="block w-full border-gray-300 rounded-md shadow-sm text-sm p-1.5 focus:border-primary-500 focus:ring-primary-500" required>
+                        ${userOptions}
+                    </select>
+                </div>
+                <div class="col-span-1 flex items-center justify-center">
+                    <button type="button" onclick="this.closest('.approver-row').remove()" class="text-red-500 hover:text-red-700">x</button>
+                </div>
+            </div>
+        `;
+        
+        // Use insertAdjacentHTML properly
+        const tempDiv = document.createElement('div');
+        container.insertAdjacentHTML('beforeend', row);
+    }
+</script>

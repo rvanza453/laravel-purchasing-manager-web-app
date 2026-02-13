@@ -1,6 +1,6 @@
 <x-app-layout>
     <div class="max-w-xl mx-auto space-y-6">
-        <h2 class="text-2xl font-bold text-gray-800">Tambah Departemen Baru</h2>
+        <h2 class="text-2xl font-bold text-gray-800">Tambah Unit Baru</h2>
 
         <div class="bg-white rounded-xl shadow-sm p-6">
             <form action="{{ route('master-departments.store') }}" method="POST">
@@ -18,20 +18,20 @@
                 </div>
 
                 <div class="mb-4">
-                    <x-input-label for="name" value="Nama Departemen (contoh: HRD, Teknik)" />
+                    <x-input-label for="name" value="Nama Unit (contoh: PKS, KDE, MJE)" />
                     <x-text-input id="name" class="block mt-1 w-full" type="text" name="name" :value="old('name')" required />
                     <x-input-error :messages="$errors->get('name')" class="mt-2" />
                 </div>
 
                 <div class="mb-4">
-                    <x-input-label for="code" value="Kode Departemen (Unik per Site)" />
-                    <x-text-input id="code" class="block mt-1 w-full" type="text" name="code" :value="old('code')" required />
-                    <x-input-error :messages="$errors->get('code')" class="mt-2" />
+                    <x-input-label for="coa" value="COA (Unik per Site)" />
+                    <x-text-input id="coa" class="block mt-1 w-full" type="text" name="coa" :value="old('coa')" required />
+                    <x-input-error :messages="$errors->get('coa')" class="mt-2" />
                 </div>
 
                 <div class="flex justify-end pt-4 border-t">
                     <x-primary-button>
-                        {{ __('Simpan Departemen') }}
+                        {{ __('Simpan Unit') }}
                     </x-primary-button>
                 </div>
             </form>

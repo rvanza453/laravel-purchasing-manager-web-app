@@ -34,10 +34,14 @@ class ApprovalService
                 // All approved
                 $pr->update(['status' => PrStatus::APPROVED->value]);
             } else {
-                // Still pending next level
-                // Optional: Notify next approver
+                if ($pr->status !== PrStatus::PENDING->value) {
+                     $pr->update(['status' => PrStatus::PENDING->value]);
+                }
             }
 
+            // Clear approver filter cache
+            $this->clearApproverCache();
+            
             return true;
          });
     }
@@ -47,14 +51,44 @@ class ApprovalService
         return DB::transaction(function () use ($approval, $remarks) {
             $approval->update([
                 'status' => PrStatus::REJECTED->value,
-                'approved_at' => now(), // Rejected time
+                'approved_at' => now(),
                 'remarks' => $remarks
             ]);
 
             // Mark PR as Rejected
             $approval->purchaseRequest->update(['status' => PrStatus::REJECTED->value]);
 
+            // Clear approver filter cache
+            $this->clearApproverCache();
+            
             return true;
         });
+    }
+
+    public function hold(PrApproval $approval, string $remarks)
+    {
+        return DB::transaction(function () use ($approval, $remarks) {
+            $approval->update([
+                'status' => PrStatus::ON_HOLD->value,
+                'approved_at' => now(), // Time of action
+                'remarks' => $remarks
+            ]);
+
+            // Mark PR as On Hold (Global Status)
+            $approval->purchaseRequest->update(['status' => PrStatus::ON_HOLD->value]);
+
+            // Clear approver filter cache
+            $this->clearApproverCache();
+            
+            return true;
+        });
+    }
+    
+    /**
+     * Clear approver filter cache
+     */
+    protected function clearApproverCache()
+    {
+        \Cache::forget('pr_current_approvers_*');
     }
 }

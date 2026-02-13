@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class SubDepartment extends Model
 {
-    protected $fillable = ['department_id', 'name', 'code'];
+    protected $fillable = ['department_id', 'name', 'coa'];
 
     public function department()
     {
@@ -17,5 +17,10 @@ class SubDepartment extends Model
     public function budgets()
     {
         return $this->hasMany(Budget::class);
+    }
+
+    public function jobCoas()
+    {
+        return $this->hasMany(JobCoa::class);
     }
 }

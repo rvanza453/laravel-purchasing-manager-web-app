@@ -12,12 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('pr_items', function (Blueprint $table) {
-            $table->dropColumn([
-                'product_link',
-                'product_image',
-                'product_name_from_link',
-                'product_price_from_link'
-            ]);
+            $table->text('remarks')->nullable()->after('specification');
         });
     }
 
@@ -27,10 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('pr_items', function (Blueprint $table) {
-            $table->text('product_link')->nullable();
-            $table->string('product_image')->nullable();
-            $table->string('product_name_from_link')->nullable();
-            $table->decimal('product_price_from_link', 15, 2)->nullable();
+            $table->dropColumn('remarks');
         });
     }
 };

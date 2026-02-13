@@ -11,8 +11,9 @@ class StockMovement extends Model
     use HasFactory;
 
     protected $fillable = [
-        'product_id', 'site_id', 'user_id', 
-        'type', 'quantity', 'reference_number', 'remarks', 'date'
+        'product_id', 'warehouse_id', 'user_id', 
+        'type', 'quantity', 'reference_number', 'remarks', 'date',
+        'sub_department_id', 'job_id', 'price'
     ];
 
     protected $casts = [
@@ -24,13 +25,23 @@ class StockMovement extends Model
         return $this->belongsTo(Product::class);
     }
 
-    public function site(): BelongsTo
+    public function warehouse(): BelongsTo
     {
-        return $this->belongsTo(Site::class);
+        return $this->belongsTo(Warehouse::class);
     }
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function subDepartment(): BelongsTo
+    {
+        return $this->belongsTo(SubDepartment::class);
+    }
+
+    public function job(): BelongsTo
+    {
+        return $this->belongsTo(Job::class);
     }
 }

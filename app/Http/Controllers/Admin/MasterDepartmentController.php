@@ -28,51 +28,51 @@ class MasterDepartmentController extends Controller
     public function create()
     {
         $sites = Site::all();
-        return view('admin.master_departments.create', compact('sites'));
+        $warehouses = \App\Models\Warehouse::all();
+        return view('admin.master_departments.create', compact('sites', 'warehouses'));
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
             'site_id' => 'required|exists:sites,id',
+            'warehouse_id' => 'nullable|exists:warehouses,id',
             'name' => 'required|string|max:255',
-            'code' => ['required', 'string', 'max:50', Rule::unique('departments')->where(function ($query) use ($request) {
+            'coa' => ['required', 'string', 'max:50', Rule::unique('departments')->where(function ($query) use ($request) {
                 return $query->where('site_id', $request->site_id);
             })],
         ]);
 
         Department::create($validated);
 
-        return redirect()->route('master-departments.index')->with('success', 'Department created successfully.');
+        return back()->with('success', 'Department created successfully.');
     }
 
     public function edit(Department $master_department)
     {
-        // Parameter binding might be 'master_department' due to resource name, 
-        // but we can map it. Let's assume route param is 'master_department'.
         $department = $master_department; 
-        
         $sites = Site::all();
+        $warehouses = \App\Models\Warehouse::all();
         $department->load('subDepartments'); 
 
-        return view('admin.master_departments.edit', compact('department', 'sites'));
+        return view('admin.master_departments.edit', compact('department', 'sites', 'warehouses'));
     }
 
     public function update(Request $request, Department $master_department)
     {
         $department = $master_department;
-        
         $validated = $request->validate([
             'site_id' => 'required|exists:sites,id', // Added site_id update capability
+            'warehouse_id' => 'nullable|exists:warehouses,id',
             'name' => 'required|string|max:255',
-            'code' => ['required', 'string', 'max:50', Rule::unique('departments')->ignore($department->id)->where(function ($query) use ($department) {
+            'coa' => ['required', 'string', 'max:50', Rule::unique('departments')->ignore($department->id)->where(function ($query) use ($department) {
                 return $query->where('site_id', $department->site_id);
             })],
         ]);
 
         $department->update($validated);
 
-        return redirect()->route('master-departments.index')->with('success', 'Department updated successfully.');
+        return back()->with('success', 'Department updated successfully.');
     }
 
     public function destroy(Department $master_department)

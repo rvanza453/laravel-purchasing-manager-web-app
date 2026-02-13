@@ -1,387 +1,593 @@
 <x-app-layout>
-    <div class="max-w-4xl mx-auto space-y-6">
-        <h2 class="text-2xl font-bold text-gray-800">Buat Pengajuan PR Baru</h2>
+    <div class="max-w-7xl mx-auto py-6">
+        <div class="mb-6">
+            <h2 class="text-2xl font-bold text-gray-800">Buat Pengajuan PR Baru</h2>
+            <p class="mt-1 text-sm text-gray-500">Lengkapi formulir di bawah untuk mengajukan Purchase Request</p>
+        </div>
 
-        <div class="bg-white rounded-xl shadow-sm p-6">
-            @if ($errors->any())
-                <div class="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                    <div class="font-bold mb-2">Terjadi kesalahan:</div>
-                    <ul class="list-disc list-inside text-sm">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+            <form action="{{ route('pr.store') }}" method="POST" enctype="multipart/form-data">
+                @if ($errors->any())
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <h3 class="text-sm font-medium text-red-800">Terjadi kesalahan pada form Anda:</h3>
+                                <div class="mt-2 text-sm text-red-700">
+                                    <ul class="list-disc list-inside space-y-1">
+                                        @foreach ($errors->all() as $error)
+                                            <li>{{ $error }}</li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
+                {{-- Budget Warning Container --}}
+                <div id="budget-warning" class="hidden bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-yellow-800">Peringatan Budget</h3>
+                            <div id="budget-warning-list" class="mt-2 text-sm text-yellow-700"></div>
+                        </div>
+                    </div>
                 </div>
-            @endif
-
-            {{-- Budget Warning Container --}}
-            <div id="budget-warning" class="hidden mb-4 bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg">
-                <div class="font-bold mb-2">Peringatan Budget:</div>
-                <div id="budget-warning-list" class="text-sm"></div>
-            </div>
-            
-            <form action="{{ route('pr.store') }}" method="POST">
                 @csrf
                 
-                {{-- Department Select --}}
-                <div class="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                        <x-input-label for="department_id" value="Departemen" />
-                        <select id="department_id" name="department_id" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500" required>
-                            <option value="">Pilih Departemen</option>
-                            @foreach($departments as $dept)
-                                <option value="{{ $dept->id }}">{{ $dept->name }} ({{ $dept->code }}) - {{ $dept->site->name }}</option>
-                            @endforeach
-                        </select>
-                        <x-input-error :messages="$errors->get('department_id')" class="mt-2" />
-                    </div>
-
-                    <div>
-                        <x-input-label for="sub_department_id" value="Afdeling / Sub Departemen" />
-                        <select id="sub_department_id" name="sub_department_id" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500" required disabled>
-                            <option value="">Pilih Departemen Terlebih Dahulu</option>
-                        </select>
-                        <x-input-error :messages="$errors->get('sub_department_id')" class="mt-2" />
-                    </div>
+                {{-- Informasi Dasar --}}
+                <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Informasi Dasar</h3>
                 </div>
-
-                <script>
-                    const deptSelect = document.getElementById('department_id');
-                    const subDeptSelect = document.getElementById('sub_department_id');
-                    const departmentsData = @json($departments);
-
-                    function updateSubDepartments() {
-                        const deptId = deptSelect.value;
-                        subDeptSelect.innerHTML = '<option value="">Pilih Sub Departemen</option>';
-                        
-                        if (deptId) {
-                            const selectedDept = departmentsData.find(d => d.id == deptId);
-                            if (selectedDept && selectedDept.sub_departments && selectedDept.sub_departments.length > 0) {
-                                subDeptSelect.disabled = false;
-                                selectedDept.sub_departments.forEach(sub => {
-                                    subDeptSelect.innerHTML += `<option value="${sub.id}">${sub.name} (${sub.code || '-'})</option>`;
-                                });
-                            } else {
-                                subDeptSelect.disabled = true;
-                                subDeptSelect.innerHTML = '<option value="">Tidak ada Sub Departemen</option>';
-                            }
-                        } else {
-                            subDeptSelect.disabled = true;
-                            subDeptSelect.innerHTML = '<option value="">Pilih Departemen Terlebih Dahulu</option>';
-                        }
-                    }
-
-                    deptSelect.addEventListener('change', updateSubDepartments);
-
-                    // Auto-trigger if only one department is available (e.g. for non-admins)
-                    if (deptSelect.options.length === 2 && deptSelect.options[1].value) {
-                         deptSelect.selectedIndex = 1;
-                         updateSubDepartments();
-                         
-                         // Determine if we should make it read-only visually (for non-admins)
-                         // But we still need to submit the value.
-                         // For better UX, if filtered from backend, just let it be selected.
-                         // But if user requested "no choice", we can hide the select or disable it?
-                         @if(!auth()->user()->hasRole('admin'))
-                            // deptSelect.style.pointerEvents = 'none'; // Optional: lock it
-                            // deptSelect.classList.add('bg-gray-100');
-                         @endif
-                    }
-                </script>
-
-                {{-- Date --}}
-                <div class="mb-4">
-                    <x-input-label for="request_date" value="Tanggal Pengajuan" />
-                    <x-text-input id="request_date" class="block mt-1 w-full bg-gray-100 text-gray-500" type="date" name="request_date" :value="date('Y-m-d')" readonly />
-                    <x-input-error :messages="$errors->get('request_date')" class="mt-2" />
-                </div>
-
-                {{-- Description --}}
-                <div class="mb-6">
-                    <x-input-label for="description" value="Keterangan / Tujuan Pengajuan" />
-                    <textarea id="description" name="description" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500" rows="3" required>{{ old('description') }}</textarea>
-                    <x-input-error :messages="$errors->get('description')" class="mt-2" />
-                </div>
-
-                {{-- Items Section --}}
-                <div class="mb-6">
-                    <div class="flex justify-between items-center mb-2">
-                        <h3 class="text-lg font-semibold text-gray-700">Item Barang</h3>
-                        <button type="button" onclick="addItem()" class="text-sm text-primary-600 hover:text-primary-700 font-medium">+ Tambah Item</button>
-                    </div>
-                    
-                    <div id="items-container" class="space-y-3">
-                        {{-- Item Row Template (Hidden) --}}
-                    </div>
-                    <p class="text-xs text-gray-400 mt-2">* Pilih produk dari Master Data atau ketik manual jika tidak ada.</p>
-                </div>
-
-                <div class="flex justify-end pt-4 border-t">
-                    <x-primary-button>
-                        {{ __('Simpan & Ajukan PR') }}
-                    </x-primary-button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    {{-- Data for JS --}}
-    <script>
-        const products = @json($products);
-        const categories = @json($categories);
-        let globalItemIndex = 0;
-
-        function addItem() {
-            const container = document.getElementById('items-container');
-            const currentIndex = globalItemIndex; // Capture current index locally
-            
-            let productOptions = '<option value="">-- Cari Produk --</option>';
-            // Add Manual Option
-            productOptions += '<option value="manual">+ Input Barang Baru / Manual</option>';
-            
-            products.forEach(p => {
-                productOptions += `<option value="${p.id}" data-name="${p.name}" data-unit="${p.unit}" data-price="${p.price_estimation || 0}">${p.code} - ${p.name}</option>`;
-            });
-
-            let categoryOptions = '<option value="">-- Pilih Kategori --</option>';
-            categories.forEach(cat => {
-                categoryOptions += `<option value="${cat}">${cat}</option>`;
-            });
-
-            const rowId = `row-${currentIndex}`;
-            const row = `
-                <div class="grid grid-cols-12 gap-3 item-row bg-gray-50 p-4 rounded-lg border border-gray-200" id="${rowId}">
-                    <div class="col-span-4">
-                        <label for="product-select-${currentIndex}" class="block text-xs font-medium text-gray-500 mb-1">Nama Barang</label>
-                        <select id="product-select-${currentIndex}" name="items[${currentIndex}][product_id]" class="block w-full border-gray-300 rounded-md shadow-sm text-sm p-1.5 focus:border-primary-500 focus:ring-primary-500">
-                            ${productOptions}
-                        </select>
-                        {{-- Hidden Input for Manual Name --}}
-                        <div id="manual-name-container-${currentIndex}" class="mt-2 hidden space-y-2">
-                            <input type="text" id="item-name-${currentIndex}" name="items[${currentIndex}][item_name]" placeholder="Ketik Nama Barang..." class="block w-full border-gray-300 rounded-md shadow-sm text-sm p-1.5 focus:border-primary-500 focus:ring-primary-500">
-                            
-                            {{-- Manual Category Select --}}
-                            <select name="items[${currentIndex}][manual_category]" class="block w-full border-gray-300 rounded-md shadow-sm text-sm p-1.5 focus:border-primary-500 focus:ring-primary-500">
-                                ${categoryOptions}
+                
+                <div class="p-6 space-y-4">
+                    {{-- Department Select --}}
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <x-input-label for="department_id" value="Unit" class="required" />
+                            <select id="department_id" name="department_id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500" required>
+                                <option value="">-- Pilih Unit --</option>
+                                @foreach($departments as $dept)
+                                    <option value="{{ $dept->id }}">{{ $dept->name }} ({{ $dept->coa }}) - {{ $dept->site->name }}</option>
+                                @endforeach
                             </select>
-                            
-                            {{-- URL Link Input --}}
-                            <input type="url" name="items[${currentIndex}][url_link]" placeholder="Link / URL Referensi (Opsional)" class="block w-full border-gray-300 rounded-md shadow-sm text-sm p-1.5 focus:border-primary-500 focus:ring-primary-500">
+                            <x-input-error :messages="$errors->get('department_id')" class="mt-2" />
                         </div>
-                        <input type="hidden" name="items[${currentIndex}][is_manual]" id="is-manual-${currentIndex}" value="0">
-                    </div>
-                    
-                    <div class="col-span-3">
-                         <label for="specification-${currentIndex}" class="block text-xs font-medium text-gray-500 mb-1">Spesifikasi</label>
-                         <textarea id="specification-${currentIndex}" name="items[${currentIndex}][specification]" rows="2" class="block w-full border-gray-300 rounded-md shadow-sm text-sm p-1.5 focus:border-primary-500 focus:ring-primary-500" placeholder="Warna, Ukuran, Merk, dll..."></textarea>
-                    </div>
 
-                    <div class="col-span-1">
-                        <label for="quantity-${currentIndex}" class="block text-xs font-medium text-gray-500 mb-1">Qty</label>
-                        <input type="number" id="quantity-${currentIndex}" name="items[${currentIndex}][quantity]" value="1" min="1" onchange="calculateSubtotal(${currentIndex})" class="block w-full border-gray-300 rounded-md shadow-sm text-sm p-1.5" required>
-                    </div>
-                    
-                    <div class="col-span-1">
-                         <label for="unit-${currentIndex}" class="block text-xs font-medium text-gray-500 mb-1">Satuan</label>
-                        <input type="text" id="unit-${currentIndex}" name="items[${currentIndex}][unit]" placeholder="Pcs" class="block w-full border-gray-300 rounded-md shadow-sm text-sm p-1.5 bg-gray-100 text-gray-500" readonly required>
-                    </div>
-                    
-                    <div class="col-span-2">
-                         <label for="price-${currentIndex}" class="block text-xs font-medium text-gray-500 mb-1">Est. Harga @</label>
-                        <input type="number" id="price-${currentIndex}" name="items[${currentIndex}][price_estimation]" value="0" min="0" onchange="calculateSubtotal(${currentIndex})" class="block w-full border-gray-300 rounded-md shadow-sm text-sm p-1.5" required>
-                        <div class="text-xs text-gray-500 mt-1 text-right">Total: <span id="subtotal-${currentIndex}" class="font-bold">0</span></div>
-                    </div>
-                    
-                    <div class="col-span-1 flex items-center justify-center pt-5">
-                        <button type="button" onclick="removeItem(this)" class="text-red-500 hover:text-red-700 bg-white p-2 rounded-full border border-gray-200 hover:bg-gray-100 shadow-sm transition">
-                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
-                    </div>
-                </div>
-            `;
-            container.insertAdjacentHTML('beforeend', row);
-            
-            // Init Tom Select
-            new TomSelect(`#product-select-${currentIndex}`, {
-                create: false,
-                sortField: { field: "text", direction: "asc" },
-                placeholder: "Cari Produk...",
-                onChange: function(value) {
-                    onProductChange(this.input, currentIndex);
-                }
-            });
+                        <div id="station-container">
+                             <x-input-label for="sub_department_id" value="Stasiun / Afdeling" class="required" />
+                             <select id="sub_department_id" name="sub_department_id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500" required>
+                                 <option value="">-- Pilih Stasiun / Afdeling --</option>
+                             </select>
+                             <x-input-error :messages="$errors->get('sub_department_id')" class="mt-2" />
+                         </div>
+                     </div>
 
-            globalItemIndex++;
-        }
+                     {{-- Date --}}
+                     <div>
+                         <x-input-label for="request_date" value="Tanggal Pengajuan" />
+                         <x-text-input id="request_date" class="block mt-1 w-full bg-gray-50 text-gray-600 cursor-not-allowed" type="date" name="request_date" :value="date('Y-m-d')" readonly />
+                         <x-input-error :messages="$errors->get('request_date')" class="mt-2" />
+                     </div>
 
-        function onProductChange(select, index) {
-            const selectedVal = select.value;
-            const containerName = document.getElementById(`manual-name-container-${index}`);
-            const inputName = containerName.querySelector('input');
-            const inputCategory = containerName.querySelector('select');
-            const inputUnit = document.querySelector(`input[name="items[${index}][unit]"]`);
-            const inputPrice = document.querySelector(`input[name="items[${index}][price_estimation]"]`);
-            
-            // is Manual?
-            if (selectedVal === 'manual') {
-                containerName.classList.remove('hidden');
-                
-                // Add required
-                inputName.required = true;
-                if(inputCategory) inputCategory.required = true;
+                     {{-- Global Job Selection (Visible only for JOB_COA) --}}
+                     <div id="global-job-container" class="hidden">
+                         <x-input-label for="global_job_id" :value="__('Pilih Job (Pekerjaan)')" class="required" />
+                         <select id="global_job_id" name="global_job_id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500" onchange="onGlobalJobChange()">
+                             <option value="">-- Pilih Job --</option>
+                         </select>
+                     </div>
+                 </div>
+                     
+                     <div class="mt-4 px-6 pb-6 space-y-4">
+                         {{-- CAPEX Checkbox --}}
+                         <div>
+                             <label class="inline-flex items-center">
+                                 <input type="checkbox" name="is_capex" value="1" class="rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50">
+                                 <span class="ml-2 text-gray-700 font-medium">Pengajuan CAPEX (Capital Expenditure)</span>
+                             </label>
+                             <p class="text-xs text-gray-500 mt-1 ml-6">Centang jika pengajuan ini merupakan belanja modal (CAPEX). Memerlukan verifikasi admin sebelum approval.</p>
+                         </div>
 
-                // Reset & Enable Unit
-                inputUnit.value = '';
-                inputUnit.removeAttribute('readonly');
-                inputUnit.classList.remove('bg-gray-100', 'text-gray-500');
-                
-                // Reset price (user must enter manually)
-                inputPrice.value = '0';
-                inputPrice.removeAttribute('readonly');
-                inputPrice.classList.remove('bg-gray-100', 'text-gray-500');
-                
-                // Enable Name
-                inputName.value = '';
+                         {{-- File Attachment --}}
+                         <div>
+                            <x-input-label for="attachment" value="Lampiran Pendukung (Foto/Dokumen)" />
+                            <input type="file" name="attachment" id="attachment" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+                            <p class="text-xs text-gray-500 mt-1">Maksimal 10MB. Format: PDF, JPG, PNG, DOCX.</p>
+                            <x-input-error :messages="$errors->get('attachment')" class="mt-2" />
+                         </div>
+                     </div>
 
-            } else if (selectedVal) {
-                 // Existing Product
-                containerName.classList.add('hidden');
-                
-                // Remove required
-                inputName.required = false;
-                if(inputCategory) inputCategory.required = false;
-
-                const p = products.find(x => x.id == selectedVal);
-                if (p) {
-                    inputName.value = p.name;
-                    
-                    inputUnit.value = p.unit;
-                    inputUnit.setAttribute('readonly', true);
-                    inputUnit.classList.add('bg-gray-100', 'text-gray-500');
-                    
-                    // Auto-fill price from product
-                    inputPrice.value = p.price_estimation || 0;
-                    inputPrice.removeAttribute('readonly');
-                    inputPrice.classList.remove('bg-gray-100', 'text-gray-500');
-                    
-                    // Recalculate subtotal
-                    calculateSubtotal(index);
-                }
-            } else {
-                // Empty
-                containerName.classList.add('hidden');
-                inputName.required = false;
-                if(inputCategory) inputCategory.required = false;
-
-                 inputUnit.value = '';
-                 inputPrice.value = '0';
-            }
-            
-            checkBudget(); // Check budget after product change
-        }
-        
-        function removeItem(btn) {
-            btn.closest('.item-row').remove();
-            checkBudget();
-        }
-
-        function calculateSubtotal(index) {
-            const qty = document.querySelector(`input[name="items[${index}][quantity]"]`).value;
-            const price = document.querySelector(`input[name="items[${index}][price_estimation]"]`).value;
-            const subtotal = qty * price;
-            document.getElementById(`subtotal-${index}`).innerText = new Intl.NumberFormat('id-ID').format(subtotal);
-            
-            checkBudget();
-        }
-
-        // Budget Data
-        let budgetData = {};
-
-        // Fetch budget when sub dept changes
-        subDeptSelect.addEventListener('change', function() {
-            const subId = this.value;
-            if(subId) {
-                fetch(`/api/budget/${subId}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        budgetData = data;
-                        checkBudget(); // Check immediately if items exist
-                    });
-            } else {
-                budgetData = {};
-                document.getElementById('budget-warning').classList.add('hidden');
-            }
-        });
-
-        // Function to check budget
-        function checkBudget() {
-            const warningContainer = document.getElementById('budget-warning');
-            const listContainer = document.getElementById('budget-warning-list');
-            let warnings = [];
-            
-            // Calculate current PR total by category
-            let currentRequest = {};
-            
-            // Iterate all visible items
-            const rows = document.querySelectorAll('.item-row');
-            rows.forEach(row => {
-                 // Get inputs directly by name attribute pattern since ID might be complex or relying on index
-                 // We can traverse the DOM from row
-                 const select = row.querySelector('select[name^="items"][name$="[product_id]"]');
-                 const manualCatSelect = row.querySelector('select[name^="items"][name$="[manual_category]"]');
-                 const qtyInput = row.querySelector('input[name^="items"][name$="[quantity]"]');
-                 const priceInput = row.querySelector('input[name^="items"][name$="[price_estimation]"]');
+                 {{-- Items Section --}}
+                 <div class="bg-gray-50 px-6 py-4 border-y border-gray-200">
+                     <div class="flex justify-between items-center">
+                         <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Daftar Item Barang</h3>
+                         <button type="button" onclick="addItem()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 shadow-sm transition">
+                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                             Tambah Item
+                         </button>
+                     </div>
+                 </div>
                  
-                 if(select && qtyInput && priceInput) {
-                     const qty = parseFloat(qtyInput.value) || 0;
-                     const price = parseFloat(priceInput.value) || 0;
-                     const total = qty * price;
-                     
-                     let category = 'Uncategorized';
-                     
-                     if (select.value === 'manual') {
-                         if (manualCatSelect) {
-                             category = manualCatSelect.value || 'Uncategorized';
-                         }
-                     } else if (select.value) {
-                         // Find product category from products data
-                         const p = products.find(x => x.id == select.value);
-                         if (p && p.category) category = p.category;
-                     }
-                     
-                     if (!currentRequest[category]) currentRequest[category] = 0;
-                     currentRequest[category] += total;
-                 }
-            });
+                 <div class="p-6">
+                     {{-- Table Container --}}
+                     <div class="border border-gray-200 rounded-lg overflow-hidden">
+                         {{-- Table Header --}}
+                         <div class="grid grid-cols-12 gap-3 bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200 py-3 px-4">
+                             <div class="col-span-3">Nama Barang</div>
+                             <div class="col-span-2">Spesifikasi</div>
+                             <div class="col-span-2">Keterangan</div>
+                             <div class="col-span-1">Qty</div>
+                             <div class="col-span-1">Satuan</div>
+                             <div class="col-span-2">Est. Harga</div>
+                             <div class="col-span-1 text-center">Aksi</div>
+                         </div>
+                         
+                         {{-- Table Body --}}
+                         <div id="items-container" class="bg-white divide-y divide-gray-100">
+                             {{-- Item rows will appear here --}}
+                         </div>
 
-            // Compare with budgetData
-            for (const [cat, amount] of Object.entries(currentRequest)) {
-                if (budgetData[cat]) {
-                    const remaining = budgetData[cat].remaining;
-                    if (amount > remaining) {
-                        const fmtAmount = new Intl.NumberFormat('id-ID').format(amount);
-                        const fmtRemaining = new Intl.NumberFormat('id-ID').format(remaining);
-                        warnings.push(`Kategori <strong>${cat}</strong>: Estimasi (${fmtAmount}) melebihi sisa budget (${fmtRemaining}). Sisa akan menjadi negatif.`);
-                    }
-                }
+                         {{-- Empty State --}}
+                         <div id="empty-items-placeholder" class="text-center py-10 bg-gray-50">
+                             <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                             </svg>
+                             <p class="mt-2 text-sm text-gray-500">Belum ada item barang.</p>
+                             <p class="text-xs text-gray-400">Klik tombol "Tambah Item" untuk memulai.</p>
+                         </div>
+                     </div>
+                 </div>
+
+                 <div class="bg-gray-50 px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                     <p class="text-sm text-gray-500">
+                         <span class="text-red-500">*</span> Wajib diisi
+                     </p>
+                     <div class="flex gap-3">
+                         <a href="{{ route('pr.index') }}" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition">
+                             Batal
+                         </a>
+                         <x-primary-button class="inline-flex items-center">
+                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                             </svg>
+                             {{ __('Simpan & Ajukan PR') }}
+                         </x-primary-button>
+                     </div>
+                 </div>
+             </form>
+         </div>
+     </div>
+
+     {{-- Data for JS --}}
+     <script>
+         // Default fallback jika tidak ada site (misal admin super user belum pilih site)
+         let currentProductList = []; 
+         const categories = @json($categories);
+         const departmentsData = @json($departments);
+         
+         const BUDGET_TYPE_STATION = 'station';
+         const BUDGET_TYPE_JOB_COA = 'job_coa';
+ 
+         let globalItemIndex = 0;
+         let currentBudgetType = BUDGET_TYPE_STATION;
+         let availableJobs = [];
+         let budgetData = {};
+         let jobSelectInstance = null; // Store TomSelect instance for Global Job
+         
+         const departmentData = @json($departments->keyBy('id'));
+         
+         const deptSelect = document.getElementById('department_id');
+         const subDeptSelect = document.getElementById('sub_department_id');
+         const warningContainer = document.getElementById('budget-warning');
+         const listContainer = document.getElementById('budget-warning-list');
+ 
+         deptSelect.addEventListener('change', updateSubDepartments);
+         subDeptSelect.addEventListener('change', onSubDepartmentChange);
+         
+ 
+         if (deptSelect.value) updateSubDepartments();
+ 
+         function updateSubDepartments() {
+             const deptId = deptSelect.value;
+             
+             // Reset
+             subDeptSelect.innerHTML = '<option value="">-- Pilih Stasiun / Afdeling --</option>';
+             availableJobs = [];
+             currentBudgetType = BUDGET_TYPE_STATION;
+             budgetData = {};
+             document.getElementById('budget-warning').classList.add('hidden');
+             
+             // Reset Products saat ganti unit
+             currentProductList = [];
+ 
+             if (deptId) {
+                 const selectedDept = departmentsData.find(d => d.id == deptId);
+                 if (selectedDept) {
+                     currentBudgetType = selectedDept.budget_type || BUDGET_TYPE_STATION;
+                     
+                     // 1. Fetch Products berdasarkan Site ID dari Department
+                     if (selectedDept.site && selectedDept.site.id) {
+                        fetch(`/api/sites/${selectedDept.site.id}/products`)
+                            .then(res => res.json())
+                            .then(data => {
+                                currentProductList = data;
+                                // Jika ada row item yang sudah terbuka, update dropdown mereka?
+                                // Untuk simplifikasi, kita biarkan row lama (user harus hapus/add lagi jika ganti Unit drastis)
+                                // Atau bisa kita panggil refreshAllItemDropdowns() jika perlu.
+                            })
+                            .catch(err => console.error("Gagal mengambil katalog produk:", err));
+                     }
+
+                     // 2. Populate Station (Sub Department)
+                     if (currentBudgetType === BUDGET_TYPE_STATION) {
+                         if (selectedDept.sub_departments && selectedDept.sub_departments.length > 0) {
+                             selectedDept.sub_departments.forEach(sub => {
+                                 subDeptSelect.insertAdjacentHTML('beforeend', `<option value="${sub.id}">${sub.name}</option>`);
+                             });
+                             subDeptSelect.removeAttribute('disabled');
+                         } else {
+                             subDeptSelect.setAttribute('disabled', 'disabled');
+                         }
+                     }
+ 
+                     // 3. Direct Job Fetching for JOB_COA
+                     if (currentBudgetType === BUDGET_TYPE_JOB_COA) {
+                          fetch(`/api/department/${deptId}/jobs`)
+                             .then(r => r.json())
+                             .then(jobs => {
+                                 availableJobs = jobs;
+                                 refreshJobDropdowns();
+                             })
+                             .catch(err => console.error('Error fetching jobs:', err));
+                     }
+                 }
+             }
+             
+             updateUIForBudgetType();
+         }
+         
+         function onSubDepartmentChange() {
+              // Can load budget per station if needed
+         }
+ 
+         function updateUIForBudgetType() {
+             // Manage Global Job Select Visibility
+             const jobContainer = document.getElementById('global-job-container');
+             const globalJobSelect = document.getElementById('global_job_id');
+             const stationContainer = document.getElementById('station-container');
+             const stationSelect = document.getElementById('sub_department_id');
+             
+             if (currentBudgetType === BUDGET_TYPE_JOB_COA) {
+                 jobContainer.classList.remove('hidden');
+                 globalJobSelect.setAttribute('required', 'required');
+                 
+                 stationContainer.classList.add('hidden');
+                 stationSelect.removeAttribute('required');
+                 stationSelect.value = '';
+             } else {
+                 jobContainer.classList.add('hidden');
+                 globalJobSelect.removeAttribute('required');
+                 globalJobSelect.value = '';
+                 
+                 stationContainer.classList.remove('hidden');
+                 stationSelect.setAttribute('required', 'required');
+             }
+         }
+        
+        function refreshJobDropdowns() {
+            // Update Global Job Select
+            const globalSelect = document.getElementById('global_job_id');
+            const currentVal = globalSelect.value; // Store old value if any
+            
+            // Destroy previous TomSelect instance if exists
+            if (jobSelectInstance) {
+                jobSelectInstance.destroy();
+                jobSelectInstance = null;
             }
 
-            if (warnings.length > 0) {
-                listContainer.innerHTML = warnings.join('<br>');
-                warningContainer.classList.remove('hidden');
+            let html = '<option value="">-- Pilih Job --</option>';
+            availableJobs.forEach(job => {
+                const label = job.code ? `${job.code} - ${job.name}` : job.name;
+                html += `<option value="${job.id}">${label}</option>`;
+            });
+            globalSelect.innerHTML = html;
+            
+            // Restore if valid
+            if (availableJobs.find(j => j.id == currentVal)) {
+                globalSelect.value = currentVal;
             } else {
-                warningContainer.classList.add('hidden');
+                globalSelect.value = '';
+            }
+
+            // Initialize TomSelect agar searchable
+            if (availableJobs.length > 0) {
+                jobSelectInstance = new TomSelect('#global_job_id', {
+                    create: false,
+                    sortField: { field: "text", direction: "asc" },
+                    placeholder: "Cari Job / Pekerjaan...",
+                    dropdownParent: 'body',
+                    onChange: function(value) {
+                        onGlobalJobChange();
+                    }
+                });
             }
         }
-
-
         
-        // Also trigger on manual category change
-        document.addEventListener('change', function(e) {
-            if(e.target.name && e.target.name.includes('[manual_category]')) {
-                checkBudget();
-            }
-        });
-        
-    </script>
-</x-app-layout>
+        function onGlobalJobChange() {
+            // When global job changes, update logic
+            const globalSelect = document.getElementById('global_job_id');
+            const jobVal = globalSelect.value;
+            
+            document.querySelectorAll('input[name$="[job_id]"]').forEach(input => {
+                input.value = jobVal;
+            });
+            
+            checkBudget();
+        }
+ 
+         function addItem() {
+             const container = document.getElementById('items-container');
+             const emptyPlaceholder = document.getElementById('empty-items-placeholder');
+             
+             if(emptyPlaceholder) emptyPlaceholder.classList.add('hidden');
+ 
+             const currentIndex = globalItemIndex; 
+             const globalJobVal = document.getElementById('global_job_id')?.value || '';
+ 
+             // Build Options from Fetched Products
+             let productOptions = '<option value="">-- Cari Barang --</option>';
+             productOptions += '<option value="manual">+ Input Manual</option>';
+             currentProductList.forEach(p => {
+                 productOptions += `<option value="${p.id}" data-name="${p.name}" data-unit="${p.unit}" data-price="${p.price_estimation || 0}">${p.code} - ${p.name}</option>`;
+             });
+ 
+             const rowId = `row-${currentIndex}`;
+ 
+             const row = `
+                 <div class="grid grid-cols-12 gap-3 item-row p-4 border-b border-gray-100 items-start hover:bg-gray-50 transition duration-150 group" id="${rowId}">
+                     
+                     <input type="hidden" name="items[${currentIndex}][job_id]" value="${globalJobVal}">
+ 
+                     {{-- 1. Nama Barang --}}
+                     <div class="col-span-3">
+                         <select id="product-select-${currentIndex}" name="items[${currentIndex}][product_id]" class="block w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm">
+                             ${productOptions}
+                         </select>
+                         
+                         {{-- Manual Input Group --}}
+                         <div id="manual-name-container-${currentIndex}" class="mt-2 hidden space-y-2 p-2 bg-yellow-50 rounded-md border border-yellow-100">
+                             <input type="text" id="item-name-${currentIndex}" name="items[${currentIndex}][item_name]" placeholder="Nama Barang..." class="block w-full border-gray-300 rounded-md text-sm focus:border-primary-500 focus:ring-primary-500">
+                             <select name="items[${currentIndex}][manual_category]" class="block w-full border-gray-300 rounded-md text-sm focus:border-primary-500 focus:ring-primary-500">
+                                 <option value="">-- Kategori --</option>
+                                 @foreach($categories as $cat)
+                                     <option value="{{ $cat }}">{{ $cat }}</option>
+                                 @endforeach
+                             </select>
+                             <input type="url" name="items[${currentIndex}][url_link]" placeholder="Link Produk (WAJIB)" class="block w-full border-gray-300 rounded-md text-sm focus:border-primary-500 focus:ring-primary-500">
+                         </div>
+                     </div>
+                     
+                     {{-- 2. Spesifikasi (Col Span 2) --}}
+                     <div class="col-span-2">
+                         <textarea name="items[${currentIndex}][specification]" rows="1" class="block w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm min-h-[38px] resize-none overflow-hidden leading-snug" placeholder="Spec..." oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"></textarea>
+                     </div>
+ 
+                     {{-- 3. Keterangan (Col Span 2) --}}
+                     <div class="col-span-2">
+                         <select id="remarks-select-${currentIndex}" name="items[${currentIndex}][remarks]" class="block w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm" placeholder="Ket...">
+                             <option value="">-- Pilih / Ketik --</option>
+                             <option value="Kehabisan Stock">Kehabisan Stock</option>
+                             <option value="Kekurangan Stock">Kekurangan Stock</option>
+                             <option value="Ngestock">Ngestock</option>
+                             <option value="Stock Menipis">Stock Menipis</option>
+                         </select>
+                     </div>
+ 
+                     {{-- 3. Qty (Col Span 1) --}}
+                     <div class="col-span-1">
+                         <input type="number" name="items[${currentIndex}][quantity]" value="1" min="1" onchange="calculateSubtotal(${currentIndex})" class="block w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500 text-center text-sm h-[38px]" required>
+                     </div>
+                     
+                     {{-- 4. Satuan (Col Span 1) --}}
+                     <div class="col-span-1">
+                         <input type="text" name="items[${currentIndex}][unit]" placeholder="Unit" class="block w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm bg-gray-50 text-center text-gray-500 h-[38px]" readonly required>
+                     </div>
+                     
+                     {{-- 5. Harga (Col Span 2) --}}
+                     <div class="col-span-2">
+                         <div class="relative rounded-md shadow-sm">
+                             <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2">
+                                 <span class="text-gray-500 sm:text-xs">Rp</span>
+                             </div>
+                             <input type="number" name="items[${currentIndex}][price_estimation]" value="0" min="0" onchange="calculateSubtotal(${currentIndex})" class="block w-full rounded-md border-gray-300 pl-7 focus:border-primary-500 focus:ring-primary-500 text-right text-sm h-[38px]" required>
+                         </div>
+                         <div class="text-[10px] text-gray-500 mt-1 text-right">Total: <span id="subtotal-${currentIndex}" class="font-bold text-gray-700">0</span></div>
+                     </div>
+                     
+                     {{-- 6. Aksi (Col Span 1) --}}
+                     <div class="col-span-1 flex items-start justify-center pt-1">
+                         <button type="button" onclick="removeItem(this)" class="text-gray-400 hover:text-red-600 transition-colors p-1.5 rounded-full hover:bg-red-50" title="Hapus Baris">
+                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                         </button>
+                     </div>
+                 </div>
+             `;
+             
+             container.insertAdjacentHTML('beforeend', row);
+             
+             new TomSelect(`#product-select-${currentIndex}`, {
+                 create: false,
+                 sortField: { field: "text", direction: "asc" },
+                 placeholder: "Cari Barang...",
+                 dropdownParent: 'body',
+                 onChange: function(value) {
+                     onProductChange(this.input, currentIndex);
+                 }
+             });
+ 
+             // Initialize TomSelect for Remarks
+             new TomSelect(`#remarks-select-${currentIndex}`, {
+                 create: true,
+                 sortField: { field: "text", direction: "asc" },
+                 placeholder: "Ket...",
+                 dropdownParent: 'body'
+             });
+ 
+             globalItemIndex++;
+         }
+ 
+         function onProductChange(select, index) {
+             const selectedVal = select.value;
+             const containerName = document.getElementById(`manual-name-container-${index}`);
+             const inputName = containerName.querySelector('input');
+             const inputCategory = containerName.querySelector('select');
+             const inputUnit = document.querySelector(`input[name="items[${index}][unit]"]`);
+             const inputPrice = document.querySelector(`input[name="items[${index}][price_estimation]"]`);
+             
+             if (selectedVal === 'manual') {
+                 containerName.classList.remove('hidden');
+                 inputName.required = true;
+                 
+                 if(inputCategory) inputCategory.required = (currentBudgetType === BUDGET_TYPE_STATION);
+ 
+                 inputUnit.value = '';
+                 inputUnit.removeAttribute('readonly');
+                 inputUnit.classList.remove('bg-gray-50', 'text-gray-500');
+                 
+                 inputPrice.value = '0';
+                 inputPrice.removeAttribute('readonly');
+                 inputPrice.classList.remove('bg-gray-50', 'text-gray-500');
+                 inputName.value = '';
+ 
+             } else if (selectedVal) {
+                 containerName.classList.add('hidden');
+                 inputName.required = false;
+                 if(inputCategory) inputCategory.required = false;
+ 
+                 const p = currentProductList.find(x => x.id == selectedVal);
+                 if (p) {
+                     inputName.value = p.name;
+                     inputUnit.value = p.unit;
+                     inputUnit.setAttribute('readonly', true);
+                     inputUnit.classList.add('bg-gray-50', 'text-gray-500');
+                     inputPrice.value = p.price_estimation || 0;
+                     inputPrice.setAttribute('readonly', true);
+                     inputPrice.classList.add('bg-gray-50', 'text-gray-500');
+                     calculateSubtotal(index);
+                 }
+             } else {
+                 containerName.classList.add('hidden');
+                 inputName.required = false;
+                 if(inputCategory) inputCategory.required = false;
+                  inputUnit.value = '';
+                  inputPrice.value = '0';
+             }
+             checkBudget(); 
+         }
+         
+         function removeItem(btn) {
+             btn.closest('.item-row').remove();
+             checkBudget();
+             
+             const container = document.getElementById('items-container');
+             const placeholder = document.getElementById('empty-items-placeholder');
+             if(container && container.children.length === 0 && placeholder) {
+                 placeholder.classList.remove('hidden');
+             }
+         }
+ 
+         function calculateSubtotal(index) {
+             const qty = document.querySelector(`input[name="items[${index}][quantity]"]`).value;
+             const price = document.querySelector(`input[name="items[${index}][price_estimation]"]`).value;
+             const subtotal = qty * price;
+             document.getElementById(`subtotal-${index}`).innerText = new Intl.NumberFormat('id-ID').format(subtotal);
+             checkBudget();
+         }
+ 
+         function checkBudget() {
+             const warningContainer = document.getElementById('budget-warning');
+             const listContainer = document.getElementById('budget-warning-list');
+             let warnings = [];
+             let currentRequest = {}; 
+             
+             const rows = document.querySelectorAll('.item-row');
+             rows.forEach(row => {
+                  const selectProduct = row.querySelector('select[name^="items"][name$="[product_id]"]');
+                  const manualCatSelect = row.querySelector('select[name^="items"][name$="[manual_category]"]');
+                  const qtyInput = row.querySelector('input[name^="items"][name$="[quantity]"]');
+                  const priceInput = row.querySelector('input[name^="items"][name$="[price_estimation]"]');
+                  const jobInput = row.querySelector('input[name$="[job_id]"]');
+                  
+                  if(qtyInput && priceInput) {
+                      const qty = parseFloat(qtyInput.value) || 0;
+                      const price = parseFloat(priceInput.value) || 0;
+                      const total = qty * price;
+                      
+                      let key = null;
+ 
+                      if (currentBudgetType === BUDGET_TYPE_JOB_COA) {
+                          const jobId = jobInput ? jobInput.value : null;
+                          if (jobId) {
+                              const job = availableJobs.find(j => j.id == jobId);
+                              if (job) key = `${job.code} - ${job.name}`;
+                          }
+                      } else {
+                          if (selectProduct && selectProduct.value === 'manual') {
+                              if (manualCatSelect) key = manualCatSelect.value;
+                          } else if (selectProduct && selectProduct.value) {
+                              const p = currentProductList.find(x => x.id == selectProduct.value);
+                              if (p && p.category) key = p.category;
+                          }
+                          if (!key) key = 'Uncategorized';
+                      }
+ 
+                      if (key) {
+                         if (!currentRequest[key]) currentRequest[key] = 0;
+                         currentRequest[key] += total;
+                      }
+                  }
+             });
+ 
+             for (const [key, amount] of Object.entries(currentRequest)) {
+                 if (budgetData[key]) {
+                     const remaining = budgetData[key].remaining;
+                     if (amount > remaining) {
+                         const fmtAmount = new Intl.NumberFormat('id-ID').format(amount);
+                         const fmtRemaining = new Intl.NumberFormat('id-ID').format(remaining);
+                         warnings.push(`<strong>${key}</strong>: Estimasi (${fmtAmount}) melebihi sisa budget (${fmtRemaining}).`);
+                     }
+                 }
+             }
+ 
+             if (warnings.length > 0) {
+                 listContainer.innerHTML = warnings.join('<br>');
+                 warningContainer.classList.remove('hidden');
+             } else {
+                 warningContainer.classList.add('hidden');
+             }
+         }
+         
+         try {
+             if (deptSelect.options.length === 2 && deptSelect.options[1].value) {
+                 deptSelect.selectedIndex = 1;
+                 updateSubDepartments();
+             } else if (deptSelect.value) {
+                 updateSubDepartments();
+             }
+         } catch (e) {
+             console.error('Error in PR Create Init:', e);
+         }
+ 
+     </script>
+ </x-app-layout>

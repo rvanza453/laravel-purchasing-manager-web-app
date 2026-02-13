@@ -13,15 +13,26 @@ class Department extends Model
 
     protected $fillable = [
         'site_id',
+        'warehouse_id',
         'name',
-        'code',
+        'coa',
         'budget',
-        'use_global_approval'
+        'use_global_approval',
+        'budget_type'
+    ];
+
+    protected $casts = [
+        'budget_type' => \App\Enums\BudgetingType::class,
     ];
 
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
+    }
+
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class);
     }
 
     public function approverConfigs(): HasMany
@@ -37,5 +48,10 @@ class Department extends Model
     public function purchaseRequests(): HasMany
     {
         return $this->hasMany(PurchaseRequest::class);
+    }
+
+    public function budgets(): HasMany
+    {
+        return $this->hasMany(Budget::class);
     }
 }

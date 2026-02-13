@@ -29,6 +29,8 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        \App\Helpers\ActivityLogger::log('login', 'User logged in');
+
         return redirect()->intended(RouteServiceProvider::HOME);
     }
 
@@ -37,6 +39,7 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
+        \App\Helpers\ActivityLogger::log('logout', 'User logged out');
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();

@@ -11,41 +11,138 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        // Fetch Stats
-        $stats = [
-            'pending_approval' => PurchaseRequest::where('status', PrStatus::PENDING->value)->count(),
-            'approved' => PurchaseRequest::where('status', PrStatus::APPROVED->value)->count(),
-            'rejected' => PurchaseRequest::where('status', PrStatus::REJECTED->value)->count(),
-            'po_created' => PurchaseRequest::where('status', PrStatus::PO_CREATED->value)->count(),
-        ];
+        $user = auth()->user();
+        $isHO = false;
+        
+        // Check if HO User (by Site Code 'HO' or GlobalApproverConfig)
+        if ($user->site && $user->site->code === 'HO') {
+            $isHO = true;
+        } elseif (\App\Models\GlobalApproverConfig::where('user_id', $user->id)->exists()) {
+            $isHO = true;
+        } elseif ($user->hasRole('admin')) {
+            $isHO = true;
+        }
 
-        // Chart Data (Budget used per department)
-        $budgetChart = PurchaseRequest::join('departments', 'purchase_requests.department_id', '=', 'departments.id')
-            ->select('departments.name', DB::raw('SUM(total_estimated_cost) as total'))
-            ->groupBy('departments.name')
-            ->get();
+        $isApprover = $user->hasRole('Approver');
+
+        // 1. Stats Query
+        $statsQuery = PurchaseRequest::query();
+
+        if (!$isHO) {
+            if ($isApprover) {
+                // Approver: Show all PRs from their site
+                $statsQuery->whereHas('user', function($q) use ($user) {
+                    $q->where('site_id', $user->site_id);
+                });
+            } else {
+                // Regular User: Show only their own PRs
+                $statsQuery->where('user_id', $user->id);
+            }
+        }
+        // HO sees all, no filter needed
+
+        // Calculate pending approvals for current user (sequential logic)
+        $pendingApprovalCount = 0;
+        if ($isApprover || $isHO) {
+            $query = \App\Models\PrApproval::whereIn('status', ['Pending', 'On Hold'])
+                ->with(['purchaseRequest.approvals']);
             
-        // Budget Summary Calculation
+            if (!$isHO) {
+                $query->where('approver_id', $user->id);
+            }
+            
+            $approvals = $query->get();
+            
+            $pendingApprovalCount = $approvals->filter(function ($approval) {
+                $allPreviousApproved = $approval->purchaseRequest->approvals
+                    ->filter(function ($other) use ($approval) {
+                        return $other->level < $approval->level;
+                    })
+                    ->every(function ($other) {
+                        return $other->status === \App\Enums\PrStatus::APPROVED->value;
+                    });
+
+                return $allPreviousApproved && $approval->status === \App\Enums\PrStatus::PENDING->value;
+            })->count();
+        }
+
+        // Waiting PO: Approved PRs that do NOT have any Purchase Orders yet (checking via items)
+        $waitingPoCount = (clone $statsQuery)->where('status', PrStatus::APPROVED->value)
+            ->whereDoesntHave('items.poItems')
+            ->count();
+
+        // PO Completed: POs that are status 'Completed'
+        $poCompletedQuery = \App\Models\PurchaseOrder::where('status', 'Completed');
+        
+        if (!$isHO) {
+            if ($isApprover) {
+                 $poCompletedQuery->whereHas('items.prItem.purchaseRequest.department', function($q) use ($user) {
+                    $q->where('site_id', $user->site_id);
+                 });
+            } else {
+                $poCompletedQuery->whereHas('items.prItem.purchaseRequest', function($q) use ($user) {
+                    $q->where('user_id', $user->id);
+                });
+            }
+        }
+        $poCompletedCount = $poCompletedQuery->count();
+
+        $stats = [
+            'pending_approval' => $pendingApprovalCount,
+            'waiting_po' => $waitingPoCount,
+            'rejected' => (clone $statsQuery)->where('status', PrStatus::REJECTED->value)->count(),
+            'po_completed' => $poCompletedCount,
+        ];
+            
+        // 2. Budget Chart (Budget used per department)
+        $chartQuery = PurchaseRequest::join('departments', 'purchase_requests.department_id', '=', 'departments.id')
+            ->select('departments.name', DB::raw('SUM(total_estimated_cost) as total'))
+            ->groupBy('departments.name');
+
+        if (!$isHO) {
+            // Both Approver and Regular User see charts only for their site's departments
+            $chartQuery->where('departments.site_id', $user->site_id);
+        }
+
+        $budgetChart = $chartQuery->get();
+            
+        // 3. Budget Summary Calculation
         $currentYear = date('Y');
-        $departments = \App\Models\Department::with(['subDepartments.budgets' => function($q) use ($currentYear) {
-            $q->where('year', $currentYear);
-        }])->get();
+        $deptQuery = \App\Models\Department::with(['subDepartments.budgets' => function($q) use ($currentYear, $isHO) {
+             $q->where('year', $currentYear);
+        }, 'budgets' => function($q) use ($currentYear) {
+             $q->where('year', $currentYear);
+        }]);
 
-        $departmentBudgets = $departments->map(function ($dept) use ($currentYear) {
-            // Calculate Allocated Budget (Sum of Sub-Dept Budgets)
-            $allocated = $dept->subDepartments->sum(function ($sub) {
-                return $sub->budgets->sum('amount');
-            });
+        if (!$isHO) {
+            // Filter departments by user's site
+            $deptQuery->where('site_id', $user->site_id);
+        }
 
-            // Calculate Used Budget (Sum of Approved/PO PRs)
-            $used = \App\Models\PurchaseRequest::where('department_id', $dept->id)
-                ->whereIn('status', [PrStatus::APPROVED->value, PrStatus::PO_CREATED->value])
-                ->whereYear('request_date', $currentYear)
-                ->sum('total_estimated_cost');
+        $departments = $deptQuery->get();
+
+        $departmentBudgets = $departments->map(function ($dept) use ($currentYear, $isHO) {
+            
+            if ($dept->budget_type === \App\Enums\BudgetingType::JOB_COA) {
+                $validBudgets = $dept->budgets->filter(function($b) {
+                    return !is_null($b->job_id);
+                });
+            } else {
+                $validBudgets = $dept->subDepartments->flatMap(function($sub) use ($dept) {
+                    return $sub->budgets->filter(function($b) use ($dept) {
+                         return !is_null($b->category) || !is_null($b->job_id);
+                    });
+                });
+            }
+
+            // Calculate Allocated
+            $allocated = $validBudgets->sum('amount');
+
+            // Calculate Used Budget 
+            $used = $validBudgets->sum('used_amount');
 
             $remaining = $allocated - $used;
 
-            // Return custom object or merge into dept
             $dept->calculated_budget = $allocated;
             $dept->used_budget = $used;
             $dept->remaining_budget = $remaining;

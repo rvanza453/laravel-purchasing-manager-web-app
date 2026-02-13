@@ -1,10 +1,10 @@
-/.phpunit.cache
+# Laravel
+/vendor
 /node_modules
 /public/build
 /public/hot
 /public/storage
 /storage/*.key
-/vendor
 .env
 .env.backup
 .env.production
@@ -14,6 +14,46 @@ Homestead.yaml
 auth.json
 npm-debug.log
 yarn-error.log
+
+# Storage
+/storage/app/public
+/storage/framework/cache/data/*
+/storage/framework/sessions/*
+/storage/framework/testing/*
+/storage/framework/views/*
+!/storage/app/.gitignore
+!/storage/framework/cache/data/.gitignore
+!/storage/framework/sessions/.gitignore
+!/storage/framework/testing/.gitignore
+!/storage/framework/views/.gitignore
+
+# IDEs
 /.fleet
 /.idea
 /.vscode
+*.suo
+*.ntvs
+*.njsproj
+*.sln
+*.sw?
+
+# Windows / OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+
+# Laragon / Local Dev
+error_log
+access_log
+debug.log
+
+# Temporary / Backup
+*.bak
+*.tmp
+*.log

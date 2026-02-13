@@ -35,7 +35,7 @@ class SubDepartmentController extends Controller
         $request->validate([
             'department_id' => 'required|exists:departments,id',
             'name' => 'required|string|max:255',
-            'code' => 'nullable|string|max:50',
+            'coa' => 'nullable|string|max:50',
         ]);
 
         SubDepartment::create($request->all());
@@ -44,7 +44,7 @@ class SubDepartmentController extends Controller
             return back()->with('success', 'Sub Department created successfully.');
         }
 
-        return redirect()->route('sub-departments.index')
+        return back()
             ->with('success', 'Sub Department created successfully.');
     }
 
@@ -65,12 +65,12 @@ class SubDepartmentController extends Controller
         $request->validate([
             'department_id' => 'required|exists:departments,id',
             'name' => 'required|string|max:255',
-            'code' => 'nullable|string|max:50',
+            'coa' => 'nullable|string|max:50',
         ]);
 
         $subDepartment->update($request->all());
 
-        return redirect()->route('admin.sub-departments.index')
+        return back()
             ->with('success', 'Sub Department updated successfully.');
     }
 

@@ -21,9 +21,9 @@ class DatabaseSeeder extends Seeder
         $siteHO = Site::create(['name' => 'Head Office', 'code' => 'HO', 'location' => 'Jakarta']);
 
         // 2. Create Departments
-        $deptIT = Department::create(['site_id' => $siteHO->id, 'name' => 'IT Department', 'code' => 'IT']);
-        $deptHR = Department::create(['site_id' => $siteHO->id, 'name' => 'Human Resources', 'code' => 'HR']);
-        $deptProd = Department::create(['site_id' => $sitePabrik->id, 'name' => 'Production', 'code' => 'PROD']);
+        $deptIT = Department::create(['site_id' => $siteHO->id, 'name' => 'IT Department', 'coa' => 'IT']);
+        $deptHR = Department::create(['site_id' => $siteHO->id, 'name' => 'Human Resources', 'coa' => 'HR']);
+        $deptProd = Department::create(['site_id' => $sitePabrik->id, 'name' => 'Production', 'coa' => 'PROD']);
 
         // 3. Roles & Permissions
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
