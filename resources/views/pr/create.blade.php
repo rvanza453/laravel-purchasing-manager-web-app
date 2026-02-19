@@ -90,15 +90,6 @@
                  </div>
                      
                      <div class="mt-4 px-6 pb-6 space-y-4">
-                         {{-- CAPEX Checkbox --}}
-                         <div>
-                             <label class="inline-flex items-center">
-                                 <input type="checkbox" name="is_capex" value="1" class="rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50">
-                                 <span class="ml-2 text-gray-700 font-medium">Pengajuan CAPEX (Capital Expenditure)</span>
-                             </label>
-                             <p class="text-xs text-gray-500 mt-1 ml-6">Centang jika pengajuan ini merupakan belanja modal (CAPEX). Memerlukan verifikasi admin sebelum approval.</p>
-                         </div>
-
                          {{-- File Attachment --}}
                          <div>
                             <x-input-label for="attachment" value="Lampiran Pendukung (Foto/Dokumen)" />

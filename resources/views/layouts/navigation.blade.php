@@ -38,13 +38,7 @@
                     <x-nav-link :href="route('pr.index')" :active="request()->routeIs('pr.*')">
                         {{ __('Daftar PR') }}
                     </x-nav-link>
-
-                    @role('admin')
-                    <x-nav-link :href="route('admin.capex.index')" :active="request()->routeIs('admin.capex.*')">
-                        {{ __('Verifikasi CAPEX') }}
-                    </x-nav-link>
-                    @endrole
-
+                    
                     {{-- Purchasing, Finance, Admin see PO List --}}
                     @hasanyrole('Purchasing|Finance|admin')
                     <x-nav-link :href="route('po.index')" :active="request()->routeIs('po.*')">
@@ -206,9 +200,7 @@
                 Master Data
             </div>
 
-            <x-responsive-nav-link :href="route('admin.capex.index')" :active="request()->routeIs('admin.capex.*')">
-                {{ __('Verifikasi CAPEX') }}
-            </x-responsive-nav-link>
+
             
             <x-responsive-nav-link :href="route('master-departments.index')" :active="request()->routeIs('master-departments.*')">
                 {{ __('Departments') }}

@@ -81,13 +81,6 @@
                         <span class="text-sm font-medium">Daftar PR</span>
                     </x-nav-link>
 
-                    @role('Admin')
-                    <x-nav-link :href="route('admin.capex.index')" :active="request()->routeIs('admin.capex.*')" class="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-white hover:shadow-sm transition-all duration-200">
-                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        <span class="text-sm font-medium">Verifikasi CAPEX</span>
-                    </x-nav-link>
-                    @endrole
-
                     <x-nav-link :href="route('po.index')" :active="request()->routeIs('po.*')" class="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-white hover:shadow-sm transition-all duration-200">
                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
                         <span class="text-sm font-medium">Daftar PO</span>

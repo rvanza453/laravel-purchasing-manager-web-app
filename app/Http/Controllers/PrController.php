@@ -501,12 +501,14 @@ class PrController extends Controller
         
         $year = date('Y');
 
-        $departments->load(['subDepartments' => function($q) use ($year) {
-             $q->whereHas('budgets', function($b) use ($year) {
-                 $b->where('year', $year)
-                   ->where('amount', '>', 0);
-             });
-        }]);
+        if ($departments->isNotEmpty()) {
+            $departments->load(['subDepartments' => function($q) use ($year) {
+                 $q->whereHas('budgets', function($b) use ($year) {
+                     $b->where('year', $year)
+                       ->where('amount', '>', 0);
+                 });
+            }]);
+        }
 
         $products = collect(); 
         
@@ -719,7 +721,7 @@ class PrController extends Controller
 
         $prData = $request->only('department_id', 'sub_department_id', 'request_date');
         $prData['description'] = $request->description ?? '-';
-        $prData['is_capex'] = $request->has('is_capex');
+
         
         $attachmentPath = null;
         if ($request->hasFile('attachment')) {
@@ -771,9 +773,7 @@ class PrController extends Controller
 
         \App\Helpers\ActivityLogger::log('created', 'Created Purchase Request: ' . $pr->pr_number, $pr);
 
-        if ($pr->is_capex) {
-            return redirect()->route('pr.index')->with('success', 'PR CAPEX berhasil dibuat dan menunggu verifikasi admin.');
-        }
+
 
         return redirect()->route('pr.index')->with('success', 'PR Submitted successfully.');
     }
@@ -1039,76 +1039,7 @@ class PrController extends Controller
         return response()->json($jobs);
     }
 
-    public function verifyCapexIndex()
-    {
-        $prs = \App\Models\PurchaseRequest::with(['department', 'user'])
-                ->where('is_capex', true)
-                ->where('status', \App\Enums\PrStatus::WAITING_VERIFICATION->value)
-                ->orderBy('created_at', 'asc')
-                ->get();
 
-        return view('admin.capex.index', compact('prs'));
-    }
-
-    public function verifyCapexStore(Request $request, \App\Models\PurchaseRequest $purchaseRequest)
-    {
-        $request->validate([
-            'capex_number' => 'required|string|max:10', // Changed validation: expecting short prefix (e.g. 01)
-        ]);
-
-        if (!$purchaseRequest->is_capex || $purchaseRequest->status !== \App\Enums\PrStatus::WAITING_VERIFICATION->value) {
-             return back()->with('error', 'PR Status Invalid for Verification.');
-        }
-        
-        $prefix = $request->capex_number;
-        $siteName = $purchaseRequest->department->site->name ?? 'HO'; 
-        
-        $month = date('n');
-        $romanMonth = $this->getRomanMonth($month);
-        $year = date('Y');
-        
-        $fullCapexNumber = sprintf("%s/Capex-%s/%s/%s", $prefix, $siteName, $romanMonth, $year);
-        
-        // Check Uniqueness manually since we construct it
-        if (\App\Models\PurchaseRequest::where('capex_number', $fullCapexNumber)->where('id', '!=', $purchaseRequest->id)->exists()) {
-            return back()->withErrors(['capex_number' => "Capex Number {$fullCapexNumber} already exists."]);
-        }
-
-        \Illuminate\Support\Facades\DB::transaction(function() use ($purchaseRequest, $fullCapexNumber) {
-             // 1. Update Capex Number & Status
-             $purchaseRequest->update([
-                 'capex_number' => $fullCapexNumber,
-                 'status' => \App\Enums\PrStatus::PENDING->value, // Move to Pending for Approval
-             ]);
-
-             // 2. Generate Approvals and Notify
-             app(\App\Services\PrService::class)->startApprovals($purchaseRequest);
-        });
-
-        return redirect()->route('admin.capex.index')->with('success', "PR {$purchaseRequest->pr_number} Verified with Capex No: {$fullCapexNumber}");
-    }
-    
-    private function getRomanMonth($month)
-    {
-        $map = [
-            1 => 'I', 2 => 'II', 3 => 'III', 4 => 'IV', 5 => 'V', 6 => 'VI',
-            7 => 'VII', 8 => 'VIII', 9 => 'IX', 10 => 'X', 11 => 'XI', 12 => 'XII'
-        ];
-        return $map[$month] ?? 'I';
-    }
-    
-    public function verifyCapexReject(Request $request, \App\Models\PurchaseRequest $purchaseRequest)
-    {
-        if (!$purchaseRequest->is_capex || $purchaseRequest->status !== \App\Enums\PrStatus::WAITING_VERIFICATION->value) {
-             return back()->with('error', 'PR Status Invalid for Verification Rejection.');
-        }
-
-        $purchaseRequest->update([
-             'status' => \App\Enums\PrStatus::REJECTED->value,
-        ]);
-        
-        return redirect()->route('admin.capex.index')->with('success', "PR {$purchaseRequest->pr_number} has been Rejected (CAPEX Verification Failed).");
-    }
     
     public function downloadAttachment(PurchaseRequest $purchaseRequest)
     {
@@ -1165,5 +1096,32 @@ class PrController extends Controller
         \Cache::forget('pr_current_approvers_*');
 
         return back()->with('success', 'Balasan berhasil dikirim. Approver akan mereview kembali PR Anda.');
+    }
+
+    public function fullApprove(Request $request, PurchaseRequest $pr, \App\Services\ApprovalService $approvalService)
+    {
+        if (!auth()->user()->hasRole('Admin')) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $password = $request->input('admin_password');
+        if ($password !== config('app.admin_verification_password')) {
+            return back()->with('error', 'Password verifikasi salah!');
+        }
+
+        if ($pr->status === \App\Enums\PrStatus::APPROVED->value || $pr->status === \App\Enums\PrStatus::REJECTED->value) {
+             return back()->with('error', 'PR is already finalized.');
+        }
+
+        try {
+            $approvalService->fullApprove($pr, auth()->id());
+            
+            \App\Helpers\ActivityLogger::log('full-approved', 'Super Admin Full Approved PR: ' . $pr->pr_number, $pr);
+            
+            return redirect()->back()->with('success', 'PR has been fully approved by Super Admin.');
+        } catch (\Exception $e) {
+             \Illuminate\Support\Facades\Log::error('Full Approve Error: ' . $e->getMessage());
+             return back()->with('error', 'Failed to approve PR: ' . $e->getMessage());
+        }
     }
 }

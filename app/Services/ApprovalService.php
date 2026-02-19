@@ -84,6 +84,32 @@ class ApprovalService
         });
     }
     
+    public function fullApprove(PurchaseRequest $pr, $adminId)
+    {
+        return DB::transaction(function () use ($pr, $adminId) {
+            // 1. Get all approvals that are NOT approved yet
+            $pendingApprovals = $pr->approvals()
+                ->where('status', '!=', PrStatus::APPROVED->value)
+                ->get();
+
+            foreach ($pendingApprovals as $approval) {
+                $approval->update([
+                    'status' => PrStatus::APPROVED->value,
+                    'approved_at' => now(),
+                    'remarks' => 'Full Approved by Super Admin',
+                ]);
+            }
+
+            // 2. Set PR Status to Approved
+            $pr->update(['status' => PrStatus::APPROVED->value]);
+
+            // 3. Clear Cache
+            $this->clearApproverCache();
+
+            return true;
+        });
+    }
+    
     /**
      * Clear approver filter cache
      */

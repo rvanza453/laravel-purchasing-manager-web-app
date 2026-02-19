@@ -6,7 +6,7 @@ enum PrStatus: string
 {
     case DRAFT = 'Draft';
     case PENDING = 'Pending';
-    case WAITING_VERIFICATION = 'Waiting Verification'; // Waiting for Capex Verification
+
     case ON_HOLD = 'On Hold';
     case APPROVED = 'Approved'; // Fully approved
     case REJECTED = 'Rejected';

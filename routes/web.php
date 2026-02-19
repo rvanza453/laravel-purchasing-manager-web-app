@@ -58,6 +58,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/users/{user}/impersonate', [\App\Http\Controllers\Admin\UserController::class, 'impersonate'])->name('users.impersonate');
         Route::resource('sites', \App\Http\Controllers\Admin\SiteController::class);
         
+        // Full Approve PR
+        Route::post('/pr/{pr}/full-approve', [\App\Http\Controllers\PrController::class, 'fullApprove'])->name('pr.full-approve');
+        
         // Product & Vendor Write Access (Admin Only)
         Route::get('products/export', [\App\Http\Controllers\Admin\ProductController::class, 'export'])->name('products.export');
         Route::resource('products', \App\Http\Controllers\Admin\ProductController::class)->except(['index', 'show']);
@@ -71,11 +74,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/admin/budgets/department/{department}/edit', [\App\Http\Controllers\Admin\BudgetController::class, 'editDepartment'])->name('admin.budgets.edit-department');
         Route::put('/admin/budgets/department/{department}', [\App\Http\Controllers\Admin\BudgetController::class, 'updateDepartment'])->name('admin.budgets.update-department');
         
-        // Capex Verification
-        Route::get('/admin/capex-verification', [\App\Http\Controllers\PrController::class, 'verifyCapexIndex'])->name('admin.capex.index');
-        Route::post('/admin/capex-verification/{purchaseRequest}', [\App\Http\Controllers\PrController::class, 'verifyCapexStore'])->name('admin.capex.verify');
-        Route::post('/admin/capex-verification/{purchaseRequest}/reject', [\App\Http\Controllers\PrController::class, 'verifyCapexReject'])->name('admin.capex.reject');
-
         // Activity Logs
         Route::get('/admin/activity-logs', [\App\Http\Controllers\Admin\ActivityLogController::class, 'index'])->name('activity-logs.index');
     });
@@ -105,7 +103,7 @@ Route::middleware('auth')->group(function () {
         // Inventory Management
         Route::get('/inventory/create', [\App\Http\Controllers\InventoryController::class, 'create'])->name('inventory.create');
         Route::post('/inventory', [\App\Http\Controllers\InventoryController::class, 'store'])->name('inventory.store');
-        Route::get('/inventory-import/kde-script', [\App\Http\Controllers\InventoryImportController::class, 'importKdeInventory'])->name('inventory.import.kde');
+        // Route::get('/inventory-import/kde-script', [\App\Http\Controllers\InventoryImportController::class, 'importKdeInventory'])->name('inventory.import.kde');
         Route::get('/inventory-import/out', [\App\Http\Controllers\InventoryImportController::class, 'formOut'])->name('inventory.import.out');
         Route::post('/inventory-import/out', [\App\Http\Controllers\InventoryImportController::class, 'store'])->name('inventory.import.out.process');
         Route::get('/inventory/{warehouse}/edit', [\App\Http\Controllers\InventoryController::class, 'edit'])->name('inventory.edit');

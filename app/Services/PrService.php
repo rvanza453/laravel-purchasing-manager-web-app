@@ -29,12 +29,23 @@ class PrService
             $dept = Department::with('site')->find($data['department_id']);
             $year = date('Y');
             $month = date('n');
-            
-            $lastPr = PurchaseRequest::whereYear('created_at', $year)
-                ->where('department_id', $data['department_id'])
-                ->orderBy('id', 'desc')
-                ->first();
-            
+            $siteName = strtoupper($dept->site->name ?? 'HO');
+            $isSsm = $siteName === 'SSM';
+
+            if ($isSsm) {
+                // SSM: counter per department within the year
+                $lastPr = PurchaseRequest::whereYear('created_at', $year)
+                    ->where('department_id', $data['department_id'])
+                    ->orderBy('id', 'desc')
+                    ->first();
+            } else {
+                // Non-SSM: counter per site within the year
+                $lastPr = PurchaseRequest::whereYear('created_at', $year)
+                    ->whereHas('department', fn($q) => $q->where('site_id', $dept->site_id))
+                    ->orderBy('id', 'desc')
+                    ->first();
+            }
+
             $count = 1;
             if ($lastPr) {
                 if (str_starts_with($lastPr->pr_number, 'PR/')) {
@@ -49,14 +60,18 @@ class PrService
             }
 
             $romanMonth = $this->getRomanMonth($month);
-            $siteName = $dept->site->name ?? 'HO';
-            $deptSiteCode = $dept->coa . '-' . $siteName;
-            
-            $prNumber = sprintf("%04d/%s/%s/%s", $count, $deptSiteCode, $romanMonth, $year);
+
+            if ($isSsm) {
+                // SSM format: XXXX/COA-SSM/ROMAN_MONTH/YEAR
+                $deptSiteCode = $dept->coa . '-' . $siteName;
+                $prNumber = sprintf("%04d/%s/%s/%s", $count, $deptSiteCode, $romanMonth, $year);
+            } else {
+                // Non-SSM format: XXXX/SITE/ROMAN_MONTH/YEAR
+                $prNumber = sprintf("%04d/%s/%s/%s", $count, $siteName, $romanMonth, $year);
+            }
 
             // 2. Create PR Record
-            $isCapex = isset($data['is_capex']) && $data['is_capex'] == '1';
-            $initialStatus = $isCapex ? PrStatus::WAITING_VERIFICATION->value : PrStatus::PENDING->value;
+            $initialStatus = PrStatus::PENDING->value;
 
             $pr = PurchaseRequest::create([
                 'user_id' => auth()->id(),
@@ -66,7 +81,7 @@ class PrService
                 'request_date' => $data['request_date'],
                 'description' => $data['description'],
                 'status' => $initialStatus,
-                'is_capex' => $isCapex,
+
                 'attachment_path' => $data['attachment_path'] ?? null,
             ]);
 
@@ -105,15 +120,9 @@ class PrService
             $pr->update(['total_estimated_cost' => $totalCost]);
 
             // 4. Generate Initial Approvals
-            // If CAPEX, skip approval generation and notification until verified
-            if (!$isCapex) {
-                $this->generateApprovals($pr);
-                
-                // Notification logic moved to scheduled command (pr:notify-pending)
-            } else {
-                Log::info('PR Created as CAPEX. Status set to WAITING_VERIFICATION. Approvals pending verification.');
-                // Optional: Notify Admin about new Capex Request
-            }
+            $this->generateApprovals($pr);
+            
+            // Notification logic moved to scheduled command (pr:notify-pending)
 
             return $pr;
         });

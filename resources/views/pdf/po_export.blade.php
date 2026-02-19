@@ -265,30 +265,30 @@
             <tr>
                 <td colspan="2" style="padding: 0; border-top: none;">
                     <!-- Title -->
-                    <div class="title" style="margin: 0; border-left: none; border-right: none; border-top: 1px solid #000; border-bottom: 1px solid #000;">PURCHASE ORDER</div>
+                    <div class="title" style="margin: 0;">PURCHASE ORDER</div>
 
                     <!-- PO Details -->
                     <div class="po-details" style="margin-bottom: 0;">
-                        <table style="width: 100%; border: none;">
+                        <table style="width: 100%;">
                             <tr>
-                                <td class="po-label" style="border: none; border-right: 1px solid #000; border-bottom: 1px solid #000; width: 120px;">PO Number</td>
-                                <td style="border: none; border-bottom: 1px solid #000;"><strong>{{ $po->po_number }}</strong></td>
+                                <td class="po-label" style="width: 120px;">PO Number</td>
+                                <td><strong>{{ $po->po_number }}</strong></td>
                             </tr>
                             <tr>
-                                <td class="po-label" style="border: none; border-right: 1px solid #000; border-bottom: 1px solid #000;">PO Date</td>
-                                <td style="border: none; border-bottom: 1px solid #000;">{{ $po->po_date ? $po->po_date->format('d/m/Y') : '-' }}</td>
+                                <td class="po-label">PO Date</td>
+                                <td>{{ $po->po_date ? $po->po_date->format('d/m/Y') : '-' }}</td>
                             </tr>
                             <tr>
-                                <td class="po-label" style="border: none; border-right: 1px solid #000; border-bottom: 1px solid #000;">Delivery Date</td>
-                                <td style="border: none; border-bottom: 1px solid #000;">{{ $po->delivery_date ? $po->delivery_date->format('d/m/Y') : '-' }}</td>
+                                <td class="po-label">Delivery Date</td>
+                                <td>{{ $po->delivery_date ? $po->delivery_date->format('d/m/Y') : '-' }}</td>
                             </tr>
                             <tr>
-                                <td class="po-label" style="border: none; border-right: 1px solid #000; border-bottom: 1px solid #000;">PR Number</td>
-                                <td style="border: none; border-bottom: 1px solid #000;"><strong>{{ $po->pr_number }}</strong></td>
+                                <td class="po-label">PR Number</td>
+                                <td><strong>{{ $po->pr_number }}</strong></td>
                             </tr>
                             <tr>
-                                <td class="po-label" style="border: none; border-right: 1px solid #000;">PR Date</td>
-                                <td style="border: none;">{{ $po->pr_date ? $po->pr_date->format('d/m/Y') : '-' }}</td>
+                                <td class="po-label">PR Date</td>
+                                <td>{{ $po->pr_date ? $po->pr_date->format('d/m/Y') : '-' }}</td>
                             </tr>
                         </table>
                     </div>
@@ -319,8 +319,8 @@
                         <td>{{ $item->prItem->specification ?? '-'}}</td>
                         <td class="text-center">{{ $item->quantity }}</td>
                         <td class="text-center">{{ $item->unit }}</td>
-                        <td class="text-right">{{ number_format($item->unit_price, 3, ',', '.') }}</td>
-                        <td class="text-right">{{ number_format($item->subtotal, 3, ',', '.') }}</td>
+                        <td class="text-right">{{ number_format($item->unit_price, 0, ',', '.') }}</td>
+                        <td class="text-right">{{ number_format($item->subtotal, 0, ',', '.') }}</td>
                     </tr>
                 @endforeach
                 
@@ -344,31 +344,31 @@
         <table class="totals-table">
             <tr>
                 <td class="totals-label">Subtotal:</td>
-                <td class="totals-value">Rp {{ number_format($po->subtotal, 3, ',', '.') }}</td>
+                <td class="totals-value">Rp {{ number_format($po->subtotal, 0, ',', '.') }}</td>
             </tr>
             @if($po->discount_percentage > 0)
                 <tr>
                     <td class="totals-label">Diskon ({{ $po->discount_percentage + 0 }}%):</td>
-                    <td class="totals-value">- Rp {{ number_format($po->discount_amount, 3, ',', '.') }}</td>
+                    <td class="totals-value">- Rp {{ number_format($po->discount_amount, 0, ',', '.') }}</td>
                 </tr>
                 <tr>
                     <td class="totals-label">Jumlah Setelah Diskon:</td>
-                    <td class="totals-value">Rp {{ number_format($po->subtotal - $po->discount_amount, 3, ',', '.') }}</td>
+                    <td class="totals-value">Rp {{ number_format($po->subtotal - $po->discount_amount, 0, ',', '.') }}</td>
                 </tr>
             @endif
             @if($po->dpp_lainnya > 0)
                 <tr>
                     <td class="totals-label">DPP Lainnya:</td>
-                    <td class="totals-value">Rp {{ number_format($po->dpp_lainnya, 3, ',', '.') }}</td>
+                    <td class="totals-value">Rp {{ number_format($po->dpp_lainnya, 0, ',', '.') }}</td>
                 </tr>
             @endif
             <tr>
-                <td class="totals-label">PPN {{ number_format($po->ppn_percentage, 2) }}%:</td>
-                <td class="totals-value">Rp {{ number_format($po->ppn_amount, 3, ',', '.') }}</td>
+                <td class="totals-label">PPN {{ number_format($po->ppn_percentage, 0) }}%:</td>
+                <td class="totals-value">Rp {{ number_format($po->ppn_amount, 0, ',', '.') }}</td>
             </tr>
             <tr class="total-final">
                 <td class="totals-label">TOTAL:</td>
-                <td class="totals-value">Rp {{ number_format($po->final_amount, 3, ',', '.') }}</td>
+                <td class="totals-value">Rp {{ number_format($po->final_amount, 0, ',', '.') }}</td>
             </tr>
         </table>
 

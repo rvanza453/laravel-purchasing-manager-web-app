@@ -16,9 +16,7 @@
                                 <span class="text-xs font-semibold text-gray-400 uppercase">PR Number</span>
                                 <div class="flex items-center gap-2">
                                     <h3 class="text-lg font-bold text-gray-800">{{ $approval->purchaseRequest->pr_number }}</h3>
-                                    @if($approval->purchaseRequest->is_capex)
-                                        <span class="bg-purple-100 text-purple-800 text-[10px] px-2 py-0.5 rounded-full font-bold border border-purple-200 uppercase">CAPEX</span>
-                                    @endif
+
                                     @if($isHold)
                                         @if($hasReply)
                                             <span class="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded-full font-bold border border-blue-200 uppercase inline-flex items-center gap-1">

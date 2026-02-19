@@ -190,9 +190,7 @@
                                         <a href="{{ route('pr.show', $item->purchaseRequest) }}" class="text-primary-600 hover:text-primary-800 hover:underline font-medium">
                                             {{ $item->purchaseRequest->pr_number }}
                                         </a>
-                                        @if($item->purchaseRequest->is_capex)
-                                             <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 ml-1">CAPEX</span>
-                                        @endif
+
                                         <div class="text-xs text-gray-500">{{ $item->purchaseRequest->request_date->format('d/m/Y') }}</div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
@@ -241,9 +239,7 @@
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="flex items-center gap-2">
                                             <div class="text-sm font-bold text-primary-600">{{ $pr->pr_number }}</div>
-                                            @if($pr->is_capex)
-                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200">CAPEX</span>
-                                            @endif
+
                                         </div>
                                         <div class="text-xs text-gray-500 mt-1">{{ $pr->request_date->format('d M Y') }}</div>
                                     </td>

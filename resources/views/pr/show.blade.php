@@ -252,46 +252,7 @@
             @endif
         @endif
 
-        @if(auth()->user()->hasRole('Admin') && $pr->is_capex && $pr->status === \App\Enums\PrStatus::WAITING_VERIFICATION->value)
-            <div class="bg-indigo-50 border border-indigo-200 rounded-xl shadow-sm p-6 space-y-4">
-                <div class="flex items-start gap-3">
-                    <div class="p-2 bg-indigo-100 rounded-lg text-indigo-600">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    </div>
-                    <div class="flex-1">
-                        <h3 class="text-lg font-bold text-gray-800">Verifikasi PR CAPEX</h3>
-                        <p class="text-sm text-gray-600 mt-1">PR ini adalah pengajuan CAPEX yang membutuhkan verifikasi nomer referensi sebelum dapat diproses lebih lanjut.</p>
-                        
-                        <form method="POST" class="mt-4 flex gap-3 items-end">
-                            @csrf
-                            <div class="flex-1 max-w-sm">
-                                <label for="capex_number" class="block text-sm font-medium text-gray-700 mb-1">Nomor CAPEX (Prefix)</label>
-                                <div class="flex rounded-md shadow-sm">
-                                    <input type="text" name="capex_number" id="capex_number" placeholder="01" class="uppercase flex-1 block w-full border-gray-300 rounded-none rounded-l-md focus:border-indigo-500 focus:ring-indigo-500 text-sm" required>
-                                    @php
-                                        $siteName = $pr->department->site->name ?? 'HO';
-                                        $map = [1=>'I',2=>'II',3=>'III',4=>'IV',5=>'V',6=>'VI',7=>'VII',8=>'VIII',9=>'IX',10=>'X',11=>'XI',12=>'XII'];
-                                        $roman = $map[date('n')] ?? 'I';
-                                        $year = date('Y');
-                                        $suffix = "/Capex-{$siteName}/{$roman}/{$year}";
-                                    @endphp
-                                    <span class="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
-                                        {{ $suffix }}
-                                    </span>
-                                </div>
-                                <p class="mt-1 text-xs text-gray-500">Cukup input nomor urut (exp: 01).</p>
-                            </div>
-                            <button type="submit" formaction="{{ route('admin.capex.verify', $pr->id) }}" class="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition" onclick="return confirm('Verifikasi PR ini sebagai CAPEX?')">
-                                Verifikasi
-                            </button>
-                            <button type="submit" formaction="{{ route('admin.capex.reject', $pr->id) }}" formnovalidate class="px-4 py-2 bg-red-100 text-red-700 rounded-md text-sm font-medium hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 shadow-sm transition" onclick="return confirm('Tolak Verifikasi CAPEX ini? PR akan ditolak permanen.')">
-                                Tolak CAPEX
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        @endif
+
 
         @if($canApprove)
         <form method="POST" id="approval-form">
@@ -582,6 +543,15 @@
                 </div>
                 
                 <div class="flex justify-end gap-3 pt-2">
+                     @if(auth()->user()->hasRole('Admin'))
+                        <button type="button" 
+                                onclick="submitFullApprove()"
+                                style="background-color: #6b21a8; color: white;"
+                                class="px-6 py-2.5 bg-purple-800 text-white font-bold rounded-lg hover:bg-purple-900 transition shadow-md hover:shadow-lg focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 flex items-center gap-2 mr-auto text-white">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            FULL APPROVE
+                        </button>
+                     @endif
                      <button type="submit" 
                              formaction="{{ route('approval.reject', $currentApproval->id) }}"
                              onclick="return validateReject()"
@@ -603,6 +573,21 @@
                 </div>
             </div>
         </form>
+
+        @if(auth()->user()->hasRole('Admin'))
+            <form id="full-approve-form" action="{{ route('pr.full-approve', $pr) }}" method="POST" class="hidden">
+                @csrf
+                <input type="hidden" name="admin_password" id="full-approve-password">
+            </form>
+            <script>
+                function submitFullApprove() {
+                    const password = prompt("Masukkan password Super Admin untuk melakukan Full Approve (Semua Level):");
+                    if (password === null) return;
+                    document.getElementById('full-approve-password').value = password;
+                    document.getElementById('full-approve-form').submit();
+                }
+            </script>
+        @endif
         
         <script>
             function showError(message) {

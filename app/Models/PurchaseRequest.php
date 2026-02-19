@@ -21,14 +21,13 @@ class PurchaseRequest extends Model
         'description',
         'total_estimated_cost',
         'sub_department_id',
-        'is_capex',
-        'capex_number'
+
     ];
 
     protected $casts = [
         'request_date' => 'date',
         'total_estimated_cost' => 'decimal:2',
-        'is_capex' => 'boolean',
+
     ];
 
     public function user(): BelongsTo

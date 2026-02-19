@@ -1,5 +1,24 @@
 <x-app-layout>
     <div class="max-w-7xl mx-auto space-y-6">
+        <!-- Error Alert -->
+        @if ($errors->any())
+            <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
+                <div class="flex items-start">
+                    <svg class="w-6 h-6 text-red-500 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <div class="flex-1">
+                        <h3 class="text-red-800 font-bold mb-2">Gagal membuat PO! Terdapat {{ $errors->count() }} kesalahan:</h3>
+                        <ul class="list-disc list-inside text-sm text-red-700 space-y-1">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         <!-- Header -->
         <div class="flex justify-between items-start">
             <div>
@@ -162,26 +181,26 @@
 
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Nama Vendor *</label>
-                                <input type="text" id="vendor_name" name="vendor_name" class="w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500 bg-gray-100" placeholder="PT AGRINDO CIPTA NUSA" value="{{ old('vendor_name') }}" required readonly>
+                                <input type="text" id="vendor_name" name="vendor_name" class="w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500 bg-gray-100 @error('vendor_name') border-red-500 @enderror" placeholder="PT AGRINDO CIPTA NUSA" value="{{ old('vendor_name') }}" required readonly>
                                 @error('vendor_name')
-                                    <p class="text-sm text-red-600 mt-1">{{ $message }}</p>
+                                    <p class="text-sm text-red-600 mt-1 font-bold">⚠️ {{ $message }}</p>
                                 @enderror
                             </div>
 
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Alamat Vendor *</label>
-                                <textarea id="vendor_address" name="vendor_address" rows="2" class="w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500 bg-gray-100" placeholder="JALAN SEMARANG B2/14B SURABAYA" required readonly>{{ old('vendor_address') }}</textarea>
+                                <textarea id="vendor_address" name="vendor_address" rows="2" class="w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500 bg-gray-100 @error('vendor_address') border-red-500 @enderror" placeholder="JALAN SEMARANG B2/14B SURABAYA" required readonly>{{ old('vendor_address') }}</textarea>
                                 @error('vendor_address')
-                                    <p class="text-sm text-red-600 mt-1">{{ $message }}</p>
+                                    <p class="text-sm text-red-600 mt-1 font-bold">⚠️ {{ $message }}</p>
                                 @enderror
                             </div>
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Telepon Vendor *</label>
-                                    <input type="text" id="vendor_phone" name="vendor_phone" class="w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500 bg-gray-100" placeholder="0315473760" value="{{ old('vendor_phone') }}" required readonly>
+                                    <input type="text" id="vendor_phone" name="vendor_phone" class="w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500 bg-gray-100 @error('vendor_phone') border-red-500 @enderror" placeholder="0315473760" value="{{ old('vendor_phone') }}" required readonly>
                                     @error('vendor_phone')
-                                        <p class="text-sm text-red-600 mt-1">{{ $message }}</p>
+                                        <p class="text-sm text-red-600 mt-1 font-bold">⚠️ {{ $message }}</p>
                                     @enderror
                                 </div>
                                 
@@ -390,6 +409,12 @@
             const isEmpty = select.value === '';
             const isManual = document.getElementById('manual-edit-toggle').checked;
 
+            console.log('=== VENDOR CHANGE DEBUG ===');
+            console.log('Selected Vendor ID:', select.value);
+            console.log('Is New:', isNew);
+            console.log('Is Empty:', isEmpty);
+            console.log('Is Manual Mode:', isManual);
+
             // Fields to control
             const fields = [
                 'vendor_name', 'vendor_address', 'vendor_phone', 'vendor_postal_code', 
@@ -398,10 +423,12 @@
             
             // If Manual Mode is ON, do NOT overwrite fields unless switching to NEW
             if (isManual && !isNew) {
+                console.log('Manual mode is ON, skipping auto-populate');
                 return; 
             }
 
             if (isNew) {
+                console.log('NEW VENDOR MODE - Clearing all fields');
                 // Enable editing, clear fields
                 fields.forEach(id => {
                     const el = document.getElementById(id);
@@ -415,35 +442,58 @@
                 document.getElementById('manual-edit-toggle').disabled = true;
                 toggleManualEdit(); // Ensure UI updates
             } else if (!isEmpty) {
-                // Populate and set ReadOnly (unless manual edit is toggled ON later)
-                document.getElementById('vendor_name').value = selectedOption.dataset.name || '';
-                document.getElementById('vendor_address').value = selectedOption.dataset.address || '';
-                document.getElementById('vendor_phone').value = selectedOption.dataset.phone || '';
-                document.getElementById('vendor_email').value = selectedOption.dataset.email || '';
-                document.getElementById('vendor_contact_person').value = selectedOption.dataset.pic || '';
+                console.log('EXISTING VENDOR - Populating fields');
                 
+                // Get vendor data from option attributes
+                const vendorData = {
+                    name: selectedOption.dataset.name || '',
+                    address: selectedOption.dataset.address || '',
+                    phone: selectedOption.dataset.phone || '',
+                    email: selectedOption.dataset.email || '',
+                    pic: selectedOption.dataset.pic || '',
+                    adminPhone: selectedOption.dataset.adminPhone || ''
+                };
+                
+                console.log('Vendor Data:', vendorData);
+                
+                // Populate fields
+                document.getElementById('vendor_name').value = vendorData.name;
+                document.getElementById('vendor_address').value = vendorData.address;
+                document.getElementById('vendor_phone').value = vendorData.phone;
+                document.getElementById('vendor_email').value = vendorData.email;
+                document.getElementById('vendor_contact_person').value = vendorData.pic;
+                document.getElementById('vendor_contact_phone').value = vendorData.adminPhone;
+                document.getElementById('vendor_postal_code').value = ''; // Always empty unless manually filled
+                
+                console.log('Fields populated. Checking for empty required fields...');
+                
+                // Check if required fields are empty
+                const emptyFields = [];
+                if (!vendorData.name) emptyFields.push('Nama Vendor');
+                if (!vendorData.address) emptyFields.push('Alamat Vendor');
+                if (!vendorData.phone) emptyFields.push('Telepon Vendor');
+                
+                if (emptyFields.length > 0) {
+                    console.error('⚠️ WARNING: Vendor data tidak lengkap!', emptyFields);
+                    alert('⚠️ PERINGATAN: Data vendor "' + selectedOption.text + '" tidak lengkap!\n\n' +
+                          'Field yang kosong: ' + emptyFields.join(', ') + '\n\n' +
+                          'Silakan aktifkan "Edit Info Manual" untuk melengkapi data, atau pilih vendor lain.');
+                }
+                
+                // Set all fields to readonly
                 fields.forEach(id => {
                     const el = document.getElementById(id);
-                    if (id !== 'vendor_postal_code' && id !== 'vendor_contact_phone') { 
-                         // Default read-only
-                         setFieldState(el, true);
-                    } else if (id === 'vendor_contact_phone') {
-                        el.value = selectedOption.dataset.adminPhone || '';
-                         setFieldState(el, true);
-                    } else {
-                         el.value = '';   
-                         setFieldState(el, true); 
-                    }
+                    setFieldState(el, true);
                 });
                 
                 document.getElementById('new-vendor-alert').classList.add('hidden');
                 document.getElementById('manual-edit-toggle').disabled = false;
                 
-                // If we changed vendor, we should probably reset manual mode unless user wants to keep it?
-                // Let's reset manual mode to ensure data consistency with the newly selected vendor first.
+                // Reset manual mode
                 document.getElementById('manual-edit-toggle').checked = false;
                 toggleManualEdit();
             } else {
+                console.log('EMPTY SELECTION - Resetting fields');
                 // Reset
                 fields.forEach(id => {
                     const el = document.getElementById(id);
@@ -455,6 +505,8 @@
                 document.getElementById('manual-edit-toggle').checked = false;
                 toggleManualEdit();
             }
+            
+            console.log('=== END VENDOR CHANGE ===\n');
         }
         
         function setFieldState(element, isReadOnly) {

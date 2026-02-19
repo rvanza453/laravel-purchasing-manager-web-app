@@ -426,7 +426,7 @@
                 @foreach($hoApprovals as $ho)
                     <td class="text-center">{{ $ho->adjusted_quantities[$item->id] ?? '-' }}</td>
                 @endforeach
-                <td class="text-right">{{ $anggaranPrice > 0 ? number_format($anggaranPrice, 0, ',', '.') : '-' }}</td>
+                <td class="text-right">{{ $anggaranPrice > 0 ? (is_numeric($anggaranPrice) ? number_format($anggaranPrice, 0, ',', '.') : '-') : '-' }}</td>
                 <td class="text-right">{{ number_format($pengajuanPrice, 0, ',', '.') }}</td>
                 <td class="text-center">{{ $finalQty }}</td>
                 <td class="text-right">{{ number_format($totalPrice, 0, ',', '.') }}</td>
@@ -436,7 +436,11 @@
             
             <tr>
                 <td colspan="{{ (10) + count($hoApprovals) }}" class="text-right" style="font-weight: bold;">
-                    Total Harga yang disetujui : Rp {{ number_format($totalPrice, 0, ',', '.') }}
+                    Total Harga yang disetujui : Rp {{ number_format($pr->items->sum(function($item) {
+                        $est = $item->product->price_estimation ?? 0;
+                        $price = $est > 0 ? $est : $item->price_estimation;
+                        return $price * $item->getFinalQuantity();
+                    }), 0, ',', '.') }}
                 </td>
                 <td colspan="2"></td>
             </tr>

@@ -178,18 +178,10 @@
                             <td class="px-6 py-4 text-sm text-gray-900 text-center font-medium">{{ $item->quantity }}</td>
                             <td class="px-6 py-4 text-sm text-gray-500">{{ $item->unit }}</td>
                             <td class="px-6 py-4 text-sm text-gray-900 text-right">
-                                @if(floor($item->unit_price) != $item->unit_price)
-                                    Rp {{ number_format($item->unit_price, 3, ',', '.') }}
-                                @else
-                                    Rp {{ number_format($item->unit_price, 0, ',', '.') }}
-                                @endif
+                                Rp {{ number_format($item->unit_price, 0, ',', '.') }}
                             </td>
                             <td class="px-6 py-4 text-sm font-medium text-gray-900 text-right">
-                                @if(floor($item->subtotal) != $item->subtotal)
-                                    Rp {{ number_format($item->subtotal, 3, ',', '.') }}
-                                @else
-                                    Rp {{ number_format($item->subtotal, 0, ',', '.') }}
-                                @endif
+                                Rp {{ number_format($item->subtotal, 0, ',', '.') }}
                             </td>
                         </tr>
                     @endforeach
@@ -204,42 +196,42 @@
             <div class="max-w-md ml-auto space-y-2">
                 <div class="flex justify-between text-sm">
                     <span class="text-gray-600">Subtotal:</span>
-                    <span class="font-medium text-gray-900">Rp {{ number_format($po->subtotal, 3, ',', '.') }}</span>
+                    <span class="font-medium text-gray-900">Rp {{ number_format($po->subtotal, 0, ',', '.') }}</span>
                 </div>
                 
                 @if($po->discount_percentage > 0)
                     <div class="flex justify-between text-sm">
                         <span class="text-gray-600">Diskon ({{ $po->discount_percentage }}%):</span>
-                        <span class="font-medium text-red-600">- Rp {{ number_format($po->discount_amount, 3, ',', '.') }}</span>
+                        <span class="font-medium text-red-600">- Rp {{ number_format($po->discount_amount, 0, ',', '.') }}</span>
                     </div>
                     <div class="flex justify-between text-sm">
                         <span class="text-gray-600">Jumlah Setelah Diskon:</span>
-                        <span class="font-medium text-gray-900">Rp {{ number_format($po->subtotal - $po->discount_amount, 3, ',', '.') }}</span>
+                        <span class="font-medium text-gray-900">Rp {{ number_format($po->subtotal - $po->discount_amount, 0, ',', '.') }}</span>
                     </div>
                 @endif
                 
                 @if($po->dpp_lainnya > 0)
                     <div class="flex justify-between text-sm">
                         <span class="text-gray-600">DPP Lainnya:</span>
-                        <span class="font-medium text-gray-900">Rp {{ number_format($po->dpp_lainnya, 3, ',', '.') }}</span>
+                        <span class="font-medium text-gray-900">Rp {{ number_format($po->dpp_lainnya, 0, ',', '.') }}</span>
                     </div>
                 @endif
                 
                 @if($po->use_vat || $po->ppn_amount > 0)
                     <div class="flex justify-between text-sm border-t border-gray-300 pt-2">
                         <span class="text-gray-600">DPP:</span>
-                        <span class="font-medium text-gray-900">Rp {{ number_format($po->dpp, 3, ',', '.') }}</span>
+                        <span class="font-medium text-gray-900">Rp {{ number_format($po->dpp, 0, ',', '.') }}</span>
                     </div>
                     
                     <div class="flex justify-between text-sm">
                         <span class="text-gray-600">PPN {{ $po->ppn_percentage }}%:</span>
-                        <span class="font-medium text-gray-900">Rp {{ number_format($po->ppn_amount, 3, ',', '.') }}</span>
+                        <span class="font-medium text-gray-900">Rp {{ number_format($po->ppn_amount, 0, ',', '.') }}</span>
                     </div>
                 @endif
                 
                 <div class="flex justify-between text-lg font-bold border-t-2 border-gray-400 pt-2">
                     <span class="text-gray-900">TOTAL:</span>
-                    <span class="text-primary-600">Rp {{ number_format($po->final_amount, 3, ',', '.') }}</span>
+                    <span class="text-primary-600">Rp {{ number_format($po->final_amount, 0, ',', '.') }}</span>
                 </div>
             </div>
         </div>

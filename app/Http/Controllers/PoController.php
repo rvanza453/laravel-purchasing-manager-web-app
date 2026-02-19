@@ -185,7 +185,7 @@ class PoController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.unit' => 'required|string',
             'items.*.unit_price' => 'required|numeric|min:0',
-            'items.*.new_product_code' => 'nullable|string|max:255|unique:products,code',
+            'items.*.new_product_code' => 'nullable|string|max:255',
             'items.*.new_product_category' => 'nullable|string|max:255',
             'pr_number_string' => 'required|string',
             'pr_date_string' => 'nullable|string',
@@ -245,19 +245,28 @@ class PoController extends Controller
         foreach ($request->items as $itemData) {
             $prItem = PrItem::find($itemData['pr_item_id']);
 
-            // Handle New Product Creation
+            // Handle Product Creation or Linking
             if (isset($itemData['new_product_code']) && !empty($itemData['new_product_code']) && $prItem && !$prItem->product_id) {
-                $newProduct = Product::create([
-                    'code' => $itemData['new_product_code'],
-                    'name' => $prItem->item_name,
-                    'category' => $itemData['new_product_category'] ?? null,
-                    'unit' => $itemData['unit'],
-                    'price_estimation' => $itemData['unit_price'], // Use PO price
-                    'min_stock' => 0,
-                ]);
-
-                // Link PR Item to the new Product
-                $prItem->update(['product_id' => $newProduct->id]);
+                // Check if product with this code already exists
+                $existingProduct = Product::where('code', $itemData['new_product_code'])->first();
+                
+                if ($existingProduct) {
+                    // Product already exists, just link it
+                    $prItem->update(['product_id' => $existingProduct->id]);
+                } else {
+                    // Create new product
+                    $newProduct = Product::create([
+                        'code' => $itemData['new_product_code'],
+                        'name' => $prItem->item_name,
+                        'category' => $itemData['new_product_category'] ?? null,
+                        'unit' => $itemData['unit'],
+                        'price_estimation' => $itemData['unit_price'],
+                        'min_stock' => 0,
+                    ]);
+                    
+                    // Link PR Item to the new Product
+                    $prItem->update(['product_id' => $newProduct->id]);
+                }
             }
 
             PoItem::create([
