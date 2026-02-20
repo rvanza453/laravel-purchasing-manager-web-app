@@ -54,6 +54,8 @@ class DashboardController extends Controller
             $approvals = $query->get();
             
             $pendingApprovalCount = $approvals->filter(function ($approval) {
+                if (!$approval->purchaseRequest) return false;
+
                 $allPreviousApproved = $approval->purchaseRequest->approvals
                     ->filter(function ($other) use ($approval) {
                         return $other->level < $approval->level;

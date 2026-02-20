@@ -58,7 +58,7 @@
                                            name="items[{{ $loop->index }}][unit_price]" 
                                            class="item-price w-full text-right border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500" 
                                            min="0" 
-                                           step="0.001"
+                                           step="any"
                                            value="{{ $item->unit_price }}"
                                            data-quantity="{{ $item->quantity }}"
                                            data-index="{{ $loop->index }}"
@@ -272,7 +272,7 @@
 
     <script>
         function formatRupiah(amount) {
-            return 'Rp ' + new Intl.NumberFormat('id-ID', { maximumFractionDigits: 3 }).format(amount);
+            return 'Rp ' + new Intl.NumberFormat('id-ID', { maximumFractionDigits: 10 }).format(amount);
         }
 
         function calculateItemTotal(input) {

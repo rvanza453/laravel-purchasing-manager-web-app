@@ -54,4 +54,9 @@ class Department extends Model
     {
         return $this->hasMany(Budget::class);
     }
+
+    public function capexConfigs(): HasMany
+    {
+        return $this->hasMany(CapexColumnConfig::class);
+    }
 }

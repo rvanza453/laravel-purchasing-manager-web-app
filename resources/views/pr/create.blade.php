@@ -111,6 +111,23 @@
                  </div>
                  
                  <div class="p-6">
+                     {{-- Info Banner --}}
+                     <div class="mb-4 bg-blue-50 border-l-4 border-blue-400 p-4">
+                         <div class="flex">
+                             <div class="flex-shrink-0">
+                                 <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                                     <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                                 </svg>
+                             </div>
+                             <div class="ml-3">
+                                 <p class="text-sm text-blue-700">
+                                     <strong>INFO:</strong> Opsi "INPUT BARANG BARU" saat ini dinonaktifkan. Mohon cari nama barang dengan seksama di dalam daftar yang tersedia.
+                                     Apabila tidak menemukan barang yang dicari, silahkan hubungi tim IT untuk penambahan data barang.
+                                 </p>
+                             </div>
+                         </div>
+                     </div>
+
                      {{-- Table Container --}}
                      <div class="border border-gray-200 rounded-lg overflow-hidden">
                          {{-- Table Header --}}
@@ -338,7 +355,7 @@
  
              // Build Options from Fetched Products
              let productOptions = '<option value="">-- Cari Barang --</option>';
-             productOptions += '<option value="manual">+ Input Manual</option>';
+             // productOptions += '<option value="manual">+ Input Manual</option>';
              currentProductList.forEach(p => {
                  productOptions += `<option value="${p.id}" data-name="${p.name}" data-unit="${p.unit}" data-price="${p.price_estimation || 0}">${p.code} - ${p.name}</option>`;
              });

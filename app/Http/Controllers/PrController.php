@@ -548,7 +548,10 @@ class PrController extends Controller
             'items.*.product_id' => [
                 'nullable', 
                 function ($attribute, $value, $fail) {
-                    if ($value === 'manual') return; 
+                    if ($value === 'manual') {
+                        $fail('Input barang baru di tolak, mohon cari apakah barang benar benar tidak ada. apabila tidak ada silahkan request ke tim IT secara manual');
+                        return;
+                    }
                     if (!empty($value) && !\App\Models\Product::where('id', $value)->exists()) {
                          $fail('Selected product is invalid.');
                     }

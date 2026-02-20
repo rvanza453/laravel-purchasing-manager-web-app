@@ -63,7 +63,7 @@
             </div>
             
             <div class="mt-8 text-white/40 text-sm z-10">
-                &copy; {{ date('Y') }} revanza. All rights reserved.
+                &copy; {{ date('Y') }} <a href="https://github.com/rvanza453" target="_blank" class="hover:text-white transition-colors">revanza</a>. All rights reserved.
             </div>
         </div>
     </body>

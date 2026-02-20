@@ -1,0 +1,420 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+
+class CapexController extends Controller
+{
+    public function index()
+    {
+        $query = \App\Models\CapexRequest::with(['user', 'department', 'capexBudget', 'approvals']);
+        
+        // Filter: Admin sees all, User sees own
+        if (!auth()->user()->hasRole('Admin') && !auth()->user()->hasRole('Approver')) { // Adjust if Approvers need to see all?
+            $query->where('user_id', auth()->id());
+        }
+        
+        // TODO: Approver Logic? Currently ApprovalController handles inbox. 
+        // This list is mainly for "My Requests" or "All Requests (Admin)"
+        
+        $capexRequests = $query->latest()->paginate(10);
+        
+        return view('capex.index', compact('capexRequests'));
+    }
+
+    public function create()
+    {
+        $departments = \App\Models\Department::all();
+        // Only load assets that have active budget for current year
+        $budgets = \App\Models\CapexBudget::with(['department', 'capexAsset'])
+                    ->where('fiscal_year', date('Y'))
+                    ->where('is_active', true)
+                    ->where('remaining_amount', '>', 0)
+                    ->get();
+                    
+        return view('capex.create', compact('departments', 'budgets'));
+    }
+
+    public function store(\Illuminate\Http\Request $request)
+    {
+        $validated = $request->validate([
+            'department_id' => 'required|exists:departments,id',
+            'capex_budget_id' => 'required|exists:capex_budgets,id',
+            'quantity' => 'required|integer|min:1',
+            'price' => 'required|numeric|min:0',
+            'type' => 'required|string',
+            'code_budget_ditanam' => 'boolean', // Is Budgeted
+            'description' => 'required|string',
+            'questionnaire' => 'required|array|size:6', // 6 static questions
+            'questionnaire.*' => 'required|string',
+        ]);
+        
+        $budget = \App\Models\CapexBudget::findOrFail($validated['capex_budget_id']);
+        $totalAmount = $validated['quantity'] * $validated['price'];
+        
+        // Validate Budget Availability (Amount & Quantity)
+        // Only validate if it is marked as "Budgeted" request
+        if ($request->has('code_budget_ditanam') && $request->code_budget_ditanam) {
+             if ($budget->remaining_amount < $totalAmount) {
+                 return back()->with('error', 'Request amount (Rp ' . number_format($totalAmount, 0) . ') exceeds remaining budget amount (Rp ' . number_format($budget->remaining_amount, 0) . ')');
+             }
+             if ($budget->remaining_quantity < $validated['quantity']) {
+                 return back()->with('error', 'Request quantity (' . $validated['quantity'] . ') exceeds remaining budget quantity (' . $budget->remaining_quantity . ')');
+             }
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function() use ($validated, $budget, $totalAmount, $request) {
+            $capex = \App\Models\CapexRequest::create([
+                'user_id' => auth()->id(),
+                'department_id' => $validated['department_id'],
+                'capex_budget_id' => $validated['capex_budget_id'],
+                'quantity' => $validated['quantity'],
+                'price' => $validated['price'],
+                'amount' => $totalAmount,
+                'type' => $validated['type'],
+                'code_budget_ditanam' => $request->has('code_budget_ditanam'),
+                'description' => $validated['description'],
+                'questionnaire_answers' => $validated['questionnaire'],
+                'status' => 'Pending',
+                'current_step' => 1
+            ]);
+            
+            // Deduct Budget only if "Budgeted"
+            if ($capex->code_budget_ditanam) {
+                $budget->decrement('remaining_amount', $totalAmount);
+                $budget->decrement('remaining_quantity', $validated['quantity']);
+            }
+            
+            // Initiate First Approval Step
+            $this->initiateApprovalStep($capex);
+        });
+
+        return redirect()->route('dashboard')->with('success', 'Capex Request Submitted Successfully');
+    }
+    
+    public function show(\App\Models\CapexRequest $capex)
+    {
+        $capex->load(['capexBudget.capexAsset', 'approvals.approver', 'user', 'department']);
+        
+        // Find current config for the current step
+        $currentConfig = \App\Models\CapexColumnConfig::where('department_id', $capex->department_id)
+                            ->where('column_index', $capex->current_step)
+                            ->first();
+
+        // Check if user can approve
+        $user = auth()->user();
+        $canApprove = false;
+        
+        if ($capex->status == 'Pending') {
+            $currentStep = $capex->current_step;
+            
+            // Admin can always approve any pending step
+            if ($user->hasRole('Admin')) {
+                $canApprove = true;
+                
+                // Ensure approval record exists for this step (create on-the-fly if missing)
+                $approval = $capex->approvals->where('column_index', $currentStep)->first();
+                if (!$approval) {
+                    \App\Models\CapexApproval::create([
+                        'capex_request_id' => $capex->id,
+                        'column_index'     => $currentStep,
+                        'approver_id'      => null,
+                        'status'           => 'Pending',
+                    ]);
+                    // Reload to get fresh state
+                    $capex->load('approvals.approver');
+                }
+            } else {
+                $approval = $capex->approvals->where('column_index', $currentStep)->first();
+                
+                if ($approval && $approval->status == 'Pending') {
+                    // Check config for this step
+                    $config = \App\Models\CapexColumnConfig::where('department_id', $capex->department_id)
+                                ->where('column_index', $currentStep)
+                                ->first();
+                    
+                    if ($config) {
+                        if ($config->approver_user_id) {
+                            // Specific User Assigned -> Strict Check
+                            if ($config->approver_user_id == $user->id) {
+                                $canApprove = true;
+                            }
+                        } elseif ($config->approver_role && $user->hasRole($config->approver_role)) {
+                            // No specific user -> Role Check
+                            $canApprove = true;
+                        }
+                    }
+                }
+            }
+        }
+        // Check if Admin can mark wet signature
+        $canMarkSigned = false;
+        if ($capex->status === 'Pending' && $currentConfig && !$currentConfig->is_digital) {
+            if (auth()->user()->hasRole('Admin') || auth()->user()->can('mark capex signed')) {
+                $canMarkSigned = true;
+            }
+        }
+
+        // Get all configs for this department to show in timeline
+    $departmentConfigs = \App\Models\CapexColumnConfig::where('department_id', $capex->department_id)
+                        ->with('approver')
+                        ->orderBy('column_index')
+                        ->get()
+                        ->keyBy('column_index');
+
+    return view('capex.show', compact('capex', 'currentConfig', 'canApprove', 'canMarkSigned', 'departmentConfigs'));
+    }
+    
+    private function initiateApprovalStep(\App\Models\CapexRequest $capex)
+    {
+        $nextStep = $capex->current_step;
+
+        // If past step 5, auto-approve the Capex
+        if ($nextStep > 5) {
+            $capex->update(['status' => 'Approved']);
+            return;
+        }
+
+        // Check if approval for this step already exists
+        $existing = $capex->approvals()->where('column_index', $nextStep)->first();
+        if ($existing) {
+            return; // Already exists, don't duplicate
+        }
+
+        // Find config for this step
+        $config = \App\Models\CapexColumnConfig::where('department_id', $capex->department_id)
+                    ->where('column_index', $nextStep)
+                    ->first();
+
+        $approverId = null;
+        if ($config) {
+            if ($config->approver_user_id) {
+                $approverId = $config->approver_user_id;
+            } elseif ($config->approver_role) {
+                $userWithRole = \App\Models\User::role($config->approver_role)->first();
+                $approverId = $userWithRole ? $userWithRole->id : null;
+            }
+        }
+
+        // Create next approval step record
+        \App\Models\CapexApproval::create([
+            'capex_request_id' => $capex->id,
+            'column_index'     => $nextStep,
+            'approver_id'      => $approverId,
+            'status'           => 'Pending'
+        ]);
+    }
+    
+    public function approve(\Illuminate\Http\Request $request, \App\Models\CapexRequest $capex)
+    {
+         // Logic to approve current step and move to next
+         $approval = $capex->approvals()->where('column_index', $capex->current_step)->where('status', 'Pending')->first();
+         
+         if (!$approval) {
+             // Redundancy check: maybe already approved?
+             return back()->with('error', 'This step is already processed or not pending.');
+         }
+         
+         // STRICT CHECK: Ensure user is authorized for *this specific step*
+         // Admin override is allowed, otherwise strict config check
+         if (!auth()->user()->hasRole('Admin')) {
+            $config = \App\Models\CapexColumnConfig::where('department_id', $capex->department_id)
+                        ->where('column_index', $capex->current_step)
+                        ->first();
+            
+            $isAuthorized = false;
+            if ($config) {
+                if ($config->approver_user_id) {
+                    // Specific User Assigned -> Strict Check
+                    if ($config->approver_user_id == auth()->id()) {
+                        $isAuthorized = true;
+                    }
+                } elseif ($config->approver_role && auth()->user()->hasRole($config->approver_role)) {
+                    // No specific user -> Role Check
+                    $isAuthorized = true;
+                }
+            }
+            
+            if (!$isAuthorized) {
+                return back()->with('error', 'You are not authorized to approve this step.');
+            }
+         }
+
+         // Determine who is recorded as the approver
+         $recordedApproverId = auth()->id();
+         if (auth()->user()->hasRole('Admin')) {
+             // If Admin, try to record the ACTUAL assigned user so PDF shows correct name
+             $stepConfig = \App\Models\CapexColumnConfig::where('department_id', $capex->department_id)
+                            ->where('column_index', $capex->current_step)
+                            ->first();
+             if ($stepConfig && $stepConfig->approver_user_id) {
+                 $recordedApproverId = $stepConfig->approver_user_id;
+             }
+         }
+
+         $approval->update([
+             'status' => 'Approved',
+             'approver_id' => $recordedApproverId, // Use the masqueraded ID if applicable
+             'remarks' => $request->remarks,
+             'signed_at' => now()
+         ]);
+         
+         $capex->increment('current_step');
+         $this->initiateApprovalStep($capex);
+         
+         return back()->with('success', 'Step Approved');
+    }
+
+    public function reject(\Illuminate\Http\Request $request, \App\Models\CapexRequest $capex)
+    {
+        $request->validate(['remarks' => 'required|string']);
+
+        $approval = $capex->approvals()->where('column_index', $capex->current_step)->where('status', 'Pending')->first();
+         
+        if (!$approval) {
+             return back()->with('error', 'This step is not pending.');
+        }
+
+        // Update Approval Record
+        $approval->update([
+             'status' => 'Rejected',
+             'approver_id' => auth()->id(),
+             'remarks' => $request->remarks,
+             'signed_at' => now()
+        ]);
+
+        // Update Capex Status (STOP PROCESS)
+        $capex->update(['status' => 'Rejected']);
+
+        return back()->with('success', 'Capex Request Rejected.');
+    }
+
+    public function hold(\Illuminate\Http\Request $request, \App\Models\CapexRequest $capex)
+    {
+        $request->validate(['remarks' => 'required|string']);
+
+        $approval = $capex->approvals()->where('column_index', $capex->current_step)->where('status', 'Pending')->first();
+         
+        if (!$approval) {
+             return back()->with('error', 'This step is not pending.');
+        }
+
+        // Update Approval Record
+        $approval->update([
+             'status' => 'On Hold',
+             'approver_id' => auth()->id(), // Mark who held it
+             'remarks' => $request->remarks,
+             'signed_at' => now()
+        ]);
+
+        // Update Capex Status
+        $capex->update(['status' => 'On Hold']);
+
+        return back()->with('success', 'Capex Request placed On Hold.');
+    }
+    
+    public function markSigned(\Illuminate\Http\Request $request, \App\Models\CapexRequest $capex)
+    {
+        // Admin manually marking a wet signature step as done
+        $approval = $capex->approvals()->where('column_index', $capex->current_step)->where('status', 'Pending')->firstOrFail();
+         
+        $approval->update([
+             'status' => 'Approved',
+             'approver_id' => auth()->id(), // Admin who verified
+             'remarks' => 'Manual Verification of Wet Signature: ' . $request->remarks,
+             'signed_at' => now()
+        ]);
+         
+        $capex->increment('current_step');
+        $this->initiateApprovalStep($capex);
+         
+        return back()->with('success', 'Wet Signature Verified');
+    }
+    public function print(\App\Models\CapexRequest $capex)
+    {
+        if ($capex->current_step < 6 && $capex->status !== 'Approved') {
+        }
+        
+        // Eager load relationships to prevent N+1 queries during PDF generation
+        $capex->load(['user', 'department', 'capexBudget.capexAsset']);
+        
+        $approvals = $capex->approvals()->with('approver')->orderBy('column_index')->get();
+        
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.capex_export', compact('capex', 'approvals'));
+        $fileName = 'Capex-' . str_replace('/', '-', $capex->capex_number) . '.pdf';
+        return $pdf->stream($fileName);
+    }
+
+    public function upload(\Illuminate\Http\Request $request, \App\Models\CapexRequest $capex)
+    {
+        $request->validate([
+            'signed_file' => 'required|mimes:pdf,jpg,jpeg,png|max:10240',
+        ]);
+
+        if ($request->file('signed_file')) {
+            $path = $request->file('signed_file')->store('capex_signed', 'public');
+            $capex->update(['signed_file_path' => $path]);
+            
+            return back()->with('success', 'Signed Document Uploaded Successfully');
+        }
+
+        return back()->with('error', 'File upload failed');
+    }
+
+    public function verify(\Illuminate\Http\Request $request, \App\Models\CapexRequest $capex)
+    {
+        // Only Admin can verify
+        if (!auth()->user()->hasRole('Admin')) { // Adjust role as needed
+            abort(403);
+        }
+
+        if (!$capex->signed_file_path) {
+            return back()->with('error', 'No signed document found to verify.');
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function() use ($capex) {
+            // 1. Mark Capex as Verified & Final Approved (if not already)
+            $capex->update([
+                'is_verified' => true,
+                'status' => 'Approved', // Ensure final status
+            ]);
+
+            // 2. Auto-Create PR
+            // Generate PR Number using standard service logic
+            $prNumber = \App\Services\PrService::generatePrNumber($capex->department_id, now());
+
+            $pr = \App\Models\PurchaseRequest::create([
+                'pr_number'    => $prNumber,
+                'user_id'      => $capex->user_id,
+                'department_id' => $capex->department_id,
+                'status'       => 'Pending',
+                'request_date' => now(),
+                'description'  => 'Auto-generated from Capex: ' . $capex->capex_number,
+                'total_estimated_cost' => $capex->amount,
+            ]);
+            
+            // Create PR Item
+            \App\Models\PrItem::create([
+                'purchase_request_id' => $pr->id,
+                'item_name'           => '[CAPEX] ' . $capex->capexBudget->capexAsset->name,
+                'quantity'            => $capex->quantity,
+                'unit'                => $capex->department->name,
+                'price_estimation'    => $capex->price,
+                'subtotal'            => $capex->amount,
+                'specification'       => 'Refer to Capex #' . $capex->capex_number,
+                'remarks'             => $capex->description,
+            ]);
+            
+            // Link PR to Capex
+            $capex->update(['pr_id' => $pr->id]);
+
+            // 3. Generate PR Approvals
+            $prService = new \App\Services\PrService();
+            $prService->startApprovals($pr);
+        });
+
+        return back()->with('success', 'Capex Verified and PR Auto-created!');
+    }
+}
+

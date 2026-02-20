@@ -19,9 +19,7 @@ class ApprovalController extends Controller
 
     public function index()
     {
-        // Admin can see all pending/on-hold approvals
-        // Regular users see only their assigned approvals which are "Current Turn"
-        
+        // 1. Get PR Approvals
         $query = PrApproval::whereIn('status', ['Pending', 'On Hold'])
             ->with(['purchaseRequest.user', 'purchaseRequest.department', 'purchaseRequest.items', 'purchaseRequest.approvals']);
         
@@ -29,9 +27,12 @@ class ApprovalController extends Controller
             $query->where('approver_id', auth()->id());
         }
         
-        $approvals = $query->orderBy('created_at', 'asc')->get();
+        $prApprovals = $query->orderBy('created_at', 'asc')->get();
         
-        $filtered = $approvals->filter(function ($approval) {
+        $filteredPr = $prApprovals->filter(function ($approval) {
+
+            if (!$approval->purchaseRequest) return false;
+
             $allPreviousApproved = $approval->purchaseRequest->approvals
                 ->filter(function ($other) use ($approval) {
                     return $other->level < $approval->level;
@@ -43,7 +44,49 @@ class ApprovalController extends Controller
             return $allPreviousApproved && in_array($approval->status, ['Pending', 'On Hold']);
         });
 
-        return view('approval.index', ['approvals' => $filtered]);
+        // 2. Get Capex Approvals (Digital Only)
+        $capexQuery = \App\Models\CapexApproval::where('status', 'Pending')
+            ->with(['capexRequest.user', 'capexRequest.department', 'capexRequest.capexBudget.capexAsset']);
+            
+        if (!auth()->user()->hasRole('Admin')) {
+            $capexQuery->where('approver_id', auth()->id());
+            // Also need to check Role-based approvals if approver_id is null? 
+            // Actually CapexController sets the approver logic on show. 
+            // For listing, we need to find approvals where I am the target.
+            // Since CapexApproval doesn't always have approver_id pre-filled if it's role based,
+            // we might need to rely on the Config. 
+            // BUT, for simplicity in this iteration, let's assume we filter by ID if set, or we fetch all and filter in PHP.
+        }
+        
+        // Fetching all pending capex approvals to filter by logic
+        $allCapexApprovals = \App\Models\CapexApproval::where('status', 'Pending')
+             ->with(['capexRequest', 'capexRequest.user'])
+             ->get();
+             
+        $filteredCapex = $allCapexApprovals->filter(function ($approval) {
+            $config = \App\Models\CapexColumnConfig::where('column_index', $approval->column_index)->first();
+            
+            // Only show if it is the current step
+            if ($approval->capexRequest->current_step != $approval->column_index) return false;
+            
+            // If Wet Signature, only Admin sees it
+            if (!$config->is_digital) {
+                return auth()->user()->hasRole('Admin');
+            }
+            
+            // Digital: Check if I am the approver
+            $user = auth()->user();
+            if ($config->approver_user_id === $user->id) return true;
+            if ($config->approver_role && $user->hasRole($config->approver_role)) return true;
+            if ($user->hasRole('Admin')) return true;
+            
+            return false;
+        });
+
+        return view('approval.index', [
+            'approvals' => $filteredPr,
+            'capexApprovals' => $filteredCapex
+        ]);
     }
 
     private function enforceSequentialApproval(PrApproval $approval)

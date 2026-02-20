@@ -150,6 +150,26 @@ Route::middleware('auth')->group(function () {
         Route::post('/approvals/{approval}/reject', [ApprovalController::class, 'reject'])->name('approval.reject');
         Route::post('/approvals/{approval}/hold', [ApprovalController::class, 'hold'])->name('approval.hold');
     });
+
+    // --- CAPEX ROUTES ---
+    Route::resource('capex', \App\Http\Controllers\CapexController::class);
+    Route::post('/capex/{capex}/approve', [\App\Http\Controllers\CapexController::class, 'approve'])->name('capex.approve');
+    Route::post('/capex/{capex}/reject', [\App\Http\Controllers\CapexController::class, 'reject'])->name('capex.reject');
+    Route::post('/capex/{capex}/hold', [\App\Http\Controllers\CapexController::class, 'hold'])->name('capex.hold');
+    Route::post('/capex/{capex}/mark-signed', [\App\Http\Controllers\CapexController::class, 'markSigned'])->name('capex.mark-signed');
+    
+    // PDF & Auto-PR Routes
+    Route::get('/capex/{capex}/print', [\App\Http\Controllers\CapexController::class, 'print'])->name('capex.print');
+    Route::post('/capex/{capex}/upload', [\App\Http\Controllers\CapexController::class, 'upload'])->name('capex.upload');
+    Route::post('/capex/{capex}/verify', [\App\Http\Controllers\CapexController::class, 'verify'])->name('capex.verify');
+
+    Route::middleware(['role:Admin'])->prefix('admin')->name('admin.')->group(function () {
+        Route::resource('capex/assets', \App\Http\Controllers\CapexAssetController::class)->names('capex.assets');
+        Route::resource('capex/budgets', \App\Http\Controllers\CapexBudgetController::class)->names('capex.budgets');
+        Route::get('capex/config', [\App\Http\Controllers\CapexConfigController::class, 'index'])->name('capex.config.index');
+        Route::get('capex/config/{department}/edit', [\App\Http\Controllers\CapexConfigController::class, 'edit'])->name('capex.config.edit');
+        Route::put('capex/config/{department}', [\App\Http\Controllers\CapexConfigController::class, 'update'])->name('capex.config.update');
+    });
 });
 
 require __DIR__.'/auth.php';

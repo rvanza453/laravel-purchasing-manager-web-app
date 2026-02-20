@@ -26,49 +26,7 @@ class PrService
     {
         return DB::transaction(function () use ($data, $items) {
             // 1. Generate PR Number
-            $dept = Department::with('site')->find($data['department_id']);
-            $year = date('Y');
-            $month = date('n');
-            $siteName = strtoupper($dept->site->name ?? 'HO');
-            $isSsm = $siteName === 'SSM';
-
-            if ($isSsm) {
-                // SSM: counter per department within the year
-                $lastPr = PurchaseRequest::whereYear('created_at', $year)
-                    ->where('department_id', $data['department_id'])
-                    ->orderBy('id', 'desc')
-                    ->first();
-            } else {
-                // Non-SSM: counter per site within the year
-                $lastPr = PurchaseRequest::whereYear('created_at', $year)
-                    ->whereHas('department', fn($q) => $q->where('site_id', $dept->site_id))
-                    ->orderBy('id', 'desc')
-                    ->first();
-            }
-
-            $count = 1;
-            if ($lastPr) {
-                if (str_starts_with($lastPr->pr_number, 'PR/')) {
-                    // Old Format: PR/CODE/YEAR/MONTH/XXXX
-                    $lastNumber = intval(substr($lastPr->pr_number, -4));
-                } else {
-                    // New Format: XXXX/CODE/ROMAN/YEAR
-                    $parts = explode('/', $lastPr->pr_number);
-                    $lastNumber = intval($parts[0]);
-                }
-                $count = $lastNumber + 1;
-            }
-
-            $romanMonth = $this->getRomanMonth($month);
-
-            if ($isSsm) {
-                // SSM format: XXXX/COA-SSM/ROMAN_MONTH/YEAR
-                $deptSiteCode = $dept->coa . '-' . $siteName;
-                $prNumber = sprintf("%04d/%s/%s/%s", $count, $deptSiteCode, $romanMonth, $year);
-            } else {
-                // Non-SSM format: XXXX/SITE/ROMAN_MONTH/YEAR
-                $prNumber = sprintf("%04d/%s/%s/%s", $count, $siteName, $romanMonth, $year);
-            }
+            $prNumber = self::generatePrNumber($data['department_id'], $data['request_date']);
 
             // 2. Create PR Record
             $initialStatus = PrStatus::PENDING->value;
@@ -122,10 +80,56 @@ class PrService
             // 4. Generate Initial Approvals
             $this->generateApprovals($pr);
             
-            // Notification logic moved to scheduled command (pr:notify-pending)
-
             return $pr;
         });
+    }
+
+    public static function generatePrNumber($departmentId, $date)
+    {
+        $dept = Department::with('site')->find($departmentId);
+        $timestamp = strtotime($date);
+        $year = date('Y', $timestamp);
+        $month = date('n', $timestamp);
+        $siteName = strtoupper($dept->site->name ?? 'HO');
+        $isSsm = $siteName === 'SSM';
+
+        if ($isSsm) {
+            // SSM: counter per department within the year
+            $lastPr = PurchaseRequest::whereYear('created_at', $year)
+                ->where('department_id', $departmentId)
+                ->orderBy('id', 'desc')
+                ->first();
+        } else {
+            // Non-SSM: counter per site within the year
+            $lastPr = PurchaseRequest::whereYear('created_at', $year)
+                ->whereHas('department', fn($q) => $q->where('site_id', $dept->site_id))
+                ->orderBy('id', 'desc')
+                ->first();
+        }
+
+        $count = 1;
+        if ($lastPr) {
+            if (str_starts_with($lastPr->pr_number, 'PR/')) {
+                // Old Format: PR/CODE/YEAR/MONTH/XXXX
+                $lastNumber = intval(substr($lastPr->pr_number, -4));
+            } else {
+                // New Format: XXXX/CODE/ROMAN/YEAR
+                $parts = explode('/', $lastPr->pr_number);
+                $lastNumber = intval($parts[0]);
+            }
+            $count = $lastNumber + 1;
+        }
+
+        $romanMonth = self::getRomanMonth($month);
+
+        if ($isSsm) {
+            // SSM format: XXXX/COA-SSM/ROMAN_MONTH/YEAR
+            $deptSiteCode = $dept->coa . '-' . $siteName;
+            return sprintf("%04d/%s/%s/%s", $count, $deptSiteCode, $romanMonth, $year);
+        } else {
+            // Non-SSM format: XXXX/SITE/ROMAN_MONTH/YEAR
+            return sprintf("%04d/%s/%s/%s", $count, $siteName, $romanMonth, $year);
+        }
     }
 
     public function startApprovals(PurchaseRequest $pr)
@@ -181,7 +185,7 @@ class PrService
         }
     }
 
-    private function getRomanMonth($month)
+    public static function getRomanMonth($month)
     {
         $map = [
             1 => 'I', 2 => 'II', 3 => 'III', 4 => 'IV', 5 => 'V', 6 => 'VI',
