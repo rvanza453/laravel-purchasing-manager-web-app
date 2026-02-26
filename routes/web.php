@@ -184,6 +184,32 @@ Route::get('/clear-cache', function() {
     }
 });
 
+Route::get('/maintenance-on', function() {
+    try {
+        // Laravel 8+ handles maintenance via a file in storage/framework
+        // We set a secret so you can still access the site to turn it off later
+        \Illuminate\Support\Facades\Artisan::call('down', [
+            '--secret' => 'admin-maintenance'
+        ]);
+        return "<h2>Sistem dalam mode Maintenance (OFFLINE)</h2>" .
+               "Pesan: " . \Illuminate\Support\Facades\Artisan::output() . "<br>" .
+               "Untuk tetap bisa mengakses sistem selama maintenance, gunakan link ini: <br>" .
+               "<a href='/admin-maintenance'>" . url('/admin-maintenance') . "</a><br><br>" .
+               "<b>Simpan link di atas!</b> Anda butuh link itu untuk mengakses jalan 'belakang' guna mematikan mode maintenance nanti.";
+    } catch (\Exception $e) {
+        return "Error: " . $e->getMessage();
+    }
+});
+
+Route::get('/maintenance-off', function() {
+    try {
+        \Illuminate\Support\Facades\Artisan::call('up');
+        return "<h2>Sistem kembali ONLINE</h2>" . \Illuminate\Support\Facades\Artisan::output();
+    } catch (\Exception $e) {
+        return "Error: " . $e->getMessage();
+    }
+});
+
 Route::get('/test-notification', function() {
     if (!auth()->check() || !auth()->user()->hasRole('Admin')) {
         abort(403, 'Unauthorized');

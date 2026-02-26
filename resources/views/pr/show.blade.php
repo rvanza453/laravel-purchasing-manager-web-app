@@ -170,6 +170,7 @@
         @if($pr->status === 'On Hold')
             @php
                 $holdApproval = $pr->approvals()
+                    ->reorder()
                     ->where('status', 'On Hold')
                     ->orderBy('level', 'desc')
                     ->first();
@@ -187,7 +188,7 @@
                             </h3>
                             <p class="text-sm text-gray-600 mt-1">
                                 Approver: <span class="font-semibold">{{ $holdApproval->approver->name }}</span> 
-                                <span class="text-gray-400">• {{ $holdApproval->approved_at->format('d M Y H:i') }}</span>
+                                <span class="text-gray-400">• {{ $holdApproval->approved_at?->format('d M Y H:i') ?? '-' }}</span>
                             </p>
                             
                             <div class="mt-4 bg-white rounded-lg p-4 border border-orange-200">
@@ -195,7 +196,7 @@
                                 <p class="text-sm text-gray-800">{{ $holdApproval->remarks }}</p>
                             </div>
 
-                            @if(auth()->id() === $pr->user_id)
+                            @if(auth()->id() == $pr->user_id)
                                 @if($holdApproval->hold_reply)
                                     {{-- Show existing reply --}}
                                     <div class="mt-4 bg-blue-50 rounded-lg p-4 border border-blue-200">
@@ -226,7 +227,7 @@
                                             required
                                         ></textarea>
                                         <div class="mt-3 flex justify-end">
-                                            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm inline-flex items-center gap-2 transition shadow-sm">
+                                            <button type="submit" class="px-5 py-2 bg-white-600 text-black font-bold rounded-lg hover:bg-orange-700 text-sm inline-flex items-center gap-2 transition shadow-md">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
                                                 Kirim Balasan
                                             </button>
@@ -658,8 +659,19 @@
                             </div>
                         </div>
                         @if($approval->remarks)
-                            <div class="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                            <div class="mt-2 text-sm text-orange-700 bg-orange-50 p-2 rounded border border-orange-100">
+                                <span class="text-xs font-semibold uppercase text-orange-500">⏸ Catatan Hold:</span>
                                 "<i>{{ $approval->remarks }}</i>"
+                            </div>
+                        @endif
+                        @if($approval->hold_reply)
+                            <div class="mt-1 text-sm text-blue-700 bg-blue-50 p-2 rounded border border-blue-100 flex items-start gap-2">
+                                <span class="text-xs font-semibold uppercase text-blue-500 whitespace-nowrap">💬 Balasan:</span>
+                                <span><i>{{ $approval->hold_reply }}</i>
+                                    @if($approval->replied_at)
+                                        <span class="text-xs text-blue-400 ml-1">· {{ $approval->replied_at->format('d M H:i') }}</span>
+                                    @endif
+                                </span>
                             </div>
                         @endif
                     </div>

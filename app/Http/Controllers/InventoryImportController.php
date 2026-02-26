@@ -194,9 +194,9 @@ class InventoryImportController extends Controller
         $coaFull = trim($data[3]);
         if (!empty($coaFull)) {
             $segmentsToKeep = 4; // Standard: x.x.x.xx
-            
-            // Traksi Logic: KDE, MJE, PKS & COA starts with 1 -> 5 segments
-            if ($isTraksiUnit && str_starts_with($coaFull, '1')) {
+
+            // COA berawalan '1' selalu baca 5 segmen (x.x.x.xx.xxx) — berlaku semua site termasuk SAE
+            if (str_starts_with($coaFull, '1')) {
                 $segmentsToKeep = 5;
             }
 

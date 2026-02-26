@@ -1070,7 +1070,7 @@ class PrController extends Controller
     {
         $user = auth()->user();
 
-        if ($pr->user_id !== $user->id) {
+        if ($pr->user_id != $user->id) {
             return back()->with('error', 'Anda tidak memiliki akses untuk membalas PR ini.');
         }
 

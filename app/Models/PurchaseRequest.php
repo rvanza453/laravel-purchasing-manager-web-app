@@ -86,12 +86,15 @@ class PurchaseRequest extends Model
             return null;
         }
 
-        // Get the latest approval record with status 'Approved'
+        // Get the HIGHEST-level approval record (HO/final approver)
+        // ->reorder() is needed to clear the default orderBy('level') ASC from the relationship,
+        // otherwise both ORDER BY clauses apply and ASC wins — returning level 1 (lowest) instead.
         $lastApproval = $this->approvals()
+                             ->reorder()
                              ->where('status', 'Approved')
-                             ->orderBy('approved_at', 'desc')
+                             ->orderBy('level', 'desc')
                              ->first();
-                             
+
         // Fallback to updated_at if no approval record found (legacy data safety)
         return $lastApproval ? $lastApproval->approved_at : $this->updated_at;
     }

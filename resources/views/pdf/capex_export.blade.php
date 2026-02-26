@@ -605,7 +605,7 @@
         <tr>
             <td>Sisa Saldo Anggaran (Anggaran - Realisasi)</td>
             <td></td>
-            <td rowspan="5" style="vertical-align: top; padding: 10px;">
+            <td rowspan="6" style="vertical-align: top; padding: 10px;">
                 KOMENTAR :
             </td>
         </tr>

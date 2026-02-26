@@ -25,74 +25,119 @@ class CapexController extends Controller
 
     public function create()
     {
-        $departments = \App\Models\Department::all();
-        // Only load assets that have active budget for current year
-        $budgets = \App\Models\CapexBudget::with(['department', 'capexAsset'])
-                    ->where('fiscal_year', date('Y'))
-                    ->where('is_active', true)
-                    ->where('remaining_amount', '>', 0)
-                    ->get();
-                    
-        return view('capex.create', compact('departments', 'budgets'));
+        $isAdmin = auth()->user()->hasRole('Admin');
+
+        if ($isAdmin) {
+            // Admin: can create for any department
+            $departments = \App\Models\Department::all();
+            $budgets = \App\Models\CapexBudget::with(['department', 'capexAsset'])
+                        ->where('fiscal_year', date('Y'))
+                        ->where('is_active', true)
+                        ->where('remaining_amount', '>', 0)
+                        ->get();
+            $userDept = null;
+        } else {
+            // Regular user: locked to own department
+            $userDept = auth()->user()->department;
+            $departments = null;
+
+            if (!$userDept) {
+                return redirect()->back()->with('error', 'Anda tidak memiliki department. Hubungi Admin.');
+            }
+
+            $budgets = \App\Models\CapexBudget::with(['department', 'capexAsset'])
+                        ->where('department_id', $userDept->id)
+                        ->where('fiscal_year', date('Y'))
+                        ->where('is_active', true)
+                        ->where('remaining_amount', '>', 0)
+                        ->get();
+        }
+
+        return view('capex.create', compact('userDept', 'budgets', 'departments', 'isAdmin'));
     }
 
     public function store(\Illuminate\Http\Request $request)
     {
         $validated = $request->validate([
-            'department_id' => 'required|exists:departments,id',
             'capex_budget_id' => 'required|exists:capex_budgets,id',
-            'quantity' => 'required|integer|min:1',
-            'price' => 'required|numeric|min:0',
-            'type' => 'required|string',
-            'code_budget_ditanam' => 'boolean', // Is Budgeted
-            'description' => 'required|string',
-            'questionnaire' => 'required|array|size:6', // 6 static questions
+            'quantity'        => 'required|integer|min:1',
+            'price'           => 'required|numeric|min:0',
+            'type'            => 'required|string',
+            'code_budget_ditanam' => 'boolean',
+            'description'     => 'required|string',
+            'questionnaire'   => 'required|array|size:6',
             'questionnaire.*' => 'required|string',
         ]);
-        
-        $budget = \App\Models\CapexBudget::findOrFail($validated['capex_budget_id']);
-        $totalAmount = $validated['quantity'] * $validated['price'];
-        
-        // Validate Budget Availability (Amount & Quantity)
-        // Only validate if it is marked as "Budgeted" request
-        if ($request->has('code_budget_ditanam') && $request->code_budget_ditanam) {
-             if ($budget->remaining_amount < $totalAmount) {
-                 return back()->with('error', 'Request amount (Rp ' . number_format($totalAmount, 0) . ') exceeds remaining budget amount (Rp ' . number_format($budget->remaining_amount, 0) . ')');
-             }
-             if ($budget->remaining_quantity < $validated['quantity']) {
-                 return back()->with('error', 'Request quantity (' . $validated['quantity'] . ') exceeds remaining budget quantity (' . $budget->remaining_quantity . ')');
-             }
+
+        $isAdmin = auth()->user()->hasRole('Admin');
+
+        if ($isAdmin) {
+            // Admin can submit for any department; department_id comes from form
+            $request->validate(['department_id' => 'required|exists:departments,id']);
+            $effectiveDeptId = (int) $request->department_id;
+        } else {
+            // Non-admin: must be locked to their own department
+            $userDept = auth()->user()->department;
+            if (!$userDept) {
+                return back()->with('error', 'Anda tidak memiliki department. Hubungi Admin.');
+            }
+            $effectiveDeptId = $userDept->id;
         }
 
-        \Illuminate\Support\Facades\DB::transaction(function() use ($validated, $budget, $totalAmount, $request) {
-            $capex = \App\Models\CapexRequest::create([
-                'user_id' => auth()->id(),
-                'department_id' => $validated['department_id'],
-                'capex_budget_id' => $validated['capex_budget_id'],
-                'quantity' => $validated['quantity'],
-                'price' => $validated['price'],
-                'amount' => $totalAmount,
-                'type' => $validated['type'],
-                'code_budget_ditanam' => $request->has('code_budget_ditanam'),
-                'description' => $validated['description'],
-                'questionnaire_answers' => $validated['questionnaire'],
-                'status' => 'Pending',
-                'current_step' => 1
-            ]);
-            
-            // Deduct Budget only if "Budgeted"
-            if ($capex->code_budget_ditanam) {
-                $budget->decrement('remaining_amount', $totalAmount);
-                $budget->decrement('remaining_quantity', $validated['quantity']);
+        $budget = \App\Models\CapexBudget::findOrFail($validated['capex_budget_id']);
+
+        // Strict check: Budget must belong to the effective department
+        if ($budget->department_id !== $effectiveDeptId) {
+            return back()->with('error', 'Budget yang dipilih bukan milik department yang dipilih. Pengajuan ditolak.');
+        }
+
+        if (!$budget->is_active || $budget->fiscal_year != date('Y')) {
+            return back()->with('error', 'Budget yang dipilih sudah tidak aktif atau bukan untuk tahun ini.');
+        }
+
+        $totalAmount = $validated['quantity'] * $validated['price'];
+        $isBudgeted  = (bool) $budget->is_budgeted;
+
+        if ($isBudgeted) {
+            if ($budget->remaining_amount < $totalAmount) {
+                return back()->with('error', 'Jumlah permintaan (Rp ' . number_format($totalAmount, 0) . ') melebihi sisa anggaran (Rp ' . number_format($budget->remaining_amount, 0) . ')');
             }
-            
+            if (isset($budget->remaining_quantity) && $budget->remaining_quantity < $validated['quantity']) {
+                return back()->with('error', 'Jumlah unit (' . $validated['quantity'] . ') melebihi sisa jumlah anggaran (' . $budget->remaining_quantity . ')');
+            }
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function() use ($validated, $budget, $totalAmount, $effectiveDeptId, $isBudgeted) {
+            $capex = \App\Models\CapexRequest::create([
+                'user_id'             => auth()->id(),
+                'department_id'       => $effectiveDeptId,
+                'capex_budget_id'     => $validated['capex_budget_id'],
+                'quantity'            => $validated['quantity'],
+                'price'               => $validated['price'],
+                'amount'              => $totalAmount,
+                'type'                => $validated['type'],
+                'code_budget_ditanam' => $isBudgeted, // Inherited from the budget's is_budgeted flag
+                'description'         => $validated['description'],
+                'questionnaire_answers' => $validated['questionnaire'],
+                'status'              => 'Pending',
+                'current_step'        => 1
+            ]);
+
+            // Only deduct budget if the budget is marked as budgeted
+            if ($isBudgeted) {
+                $budget->decrement('remaining_amount', $totalAmount);
+                if (isset($budget->remaining_quantity)) {
+                    $budget->decrement('remaining_quantity', $validated['quantity']);
+                }
+            }
+
             // Initiate First Approval Step
             $this->initiateApprovalStep($capex);
         });
 
-        return redirect()->route('dashboard')->with('success', 'Capex Request Submitted Successfully');
+        return redirect()->route('dashboard')->with('success', 'Capex Request berhasil diajukan!');
     }
-    
+
     public function show(\App\Models\CapexRequest $capex)
     {
         $capex->load(['capexBudget.capexAsset', 'approvals.approver', 'user', 'department']);
@@ -106,7 +151,7 @@ class CapexController extends Controller
         $user = auth()->user();
         $canApprove = false;
         
-        if ($capex->status == 'Pending') {
+        if (in_array($capex->status, ['Pending', 'On Hold'])) {
             $currentStep = $capex->current_step;
             
             // Admin can always approve any pending step
@@ -128,7 +173,7 @@ class CapexController extends Controller
             } else {
                 $approval = $capex->approvals->where('column_index', $currentStep)->first();
                 
-                if ($approval && $approval->status == 'Pending') {
+                if ($approval && in_array($approval->status, ['Pending', 'On Hold'])) {
                     // Check config for this step
                     $config = \App\Models\CapexColumnConfig::where('department_id', $capex->department_id)
                                 ->where('column_index', $currentStep)
@@ -150,7 +195,7 @@ class CapexController extends Controller
         }
         // Check if Admin can mark wet signature
         $canMarkSigned = false;
-        if ($capex->status === 'Pending' && $currentConfig && !$currentConfig->is_digital) {
+        if (in_array($capex->status, ['Pending', 'On Hold']) && $currentConfig && !$currentConfig->is_digital) {
             if (auth()->user()->hasRole('Admin') || auth()->user()->can('mark capex signed')) {
                 $canMarkSigned = true;
             }
@@ -209,7 +254,7 @@ class CapexController extends Controller
     public function approve(\Illuminate\Http\Request $request, \App\Models\CapexRequest $capex)
     {
          // Logic to approve current step and move to next
-         $approval = $capex->approvals()->where('column_index', $capex->current_step)->where('status', 'Pending')->first();
+         $approval = $capex->approvals()->where('column_index', $capex->current_step)->whereIn('status', ['Pending', 'On Hold'])->first();
          
          if (!$approval) {
              // Redundancy check: maybe already approved?
@@ -255,11 +300,14 @@ class CapexController extends Controller
 
          $approval->update([
              'status' => 'Approved',
-             'approver_id' => $recordedApproverId, // Use the masqueraded ID if applicable
+             'approver_id' => $recordedApproverId,
              'remarks' => $request->remarks,
              'signed_at' => now()
          ]);
          
+         // Reset capex status to Pending (clears any On Hold state from this step)
+         $capex->update(['status' => 'Pending']);
+
          $capex->increment('current_step');
          $this->initiateApprovalStep($capex);
          
@@ -270,7 +318,7 @@ class CapexController extends Controller
     {
         $request->validate(['remarks' => 'required|string']);
 
-        $approval = $capex->approvals()->where('column_index', $capex->current_step)->where('status', 'Pending')->first();
+        $approval = $capex->approvals()->where('column_index', $capex->current_step)->whereIn('status', ['Pending', 'On Hold'])->first();
          
         if (!$approval) {
              return back()->with('error', 'This step is not pending.');
@@ -294,7 +342,7 @@ class CapexController extends Controller
     {
         $request->validate(['remarks' => 'required|string']);
 
-        $approval = $capex->approvals()->where('column_index', $capex->current_step)->where('status', 'Pending')->first();
+        $approval = $capex->approvals()->where('column_index', $capex->current_step)->whereIn('status', ['Pending', 'On Hold'])->first();
          
         if (!$approval) {
              return back()->with('error', 'This step is not pending.');

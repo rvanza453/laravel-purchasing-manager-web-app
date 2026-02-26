@@ -9,27 +9,32 @@
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
                 
-                @if($budgets->isEmpty())
-                    <div class="bg-yellow-50 text-yellow-800 p-4 rounded-lg mb-4">
-                        Warning: No Active Budgets found for this year. Please ask Admin to set up Capex Budgets.
-                    </div>
-                @else
-                
+
+                {{-- Budget will always be filtered to user's department, no need to show warning --}}
+
                 <form action="{{ route('capex.store') }}" method="POST" class="space-y-6">
                     @csrf
                     
-                    <!-- Basic Info -->
-                    <!-- Request Details -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {{-- Department: Dropdown for Admin, Read-only for regular users --}}
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Department</label>
-                            <select name="department_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                @foreach($departments as $dept)
-                                    <option value="{{ $dept->id }}">{{ $dept->name }}</option>
-                                @endforeach
-                            </select>
+                            @if($isAdmin)
+                                <select id="departmentSelect" name="department_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    @foreach($departments as $dept)
+                                        <option value="{{ $dept->id }}">{{ $dept->name }}</option>
+                                    @endforeach
+                                </select>
+                                <p class="text-xs text-gray-400 mt-1">Admin dapat memilih department mana pun.</p>
+                            @else
+                                <div class="mt-1 flex items-center gap-2">
+                                    <input type="text" value="{{ $userDept->name }}" class="block w-full rounded-md border-gray-200 bg-gray-100 text-gray-600 shadow-sm cursor-not-allowed" readonly>
+                                    <span class="text-xs text-gray-400 whitespace-nowrap">🔒 Auto-assigned</span>
+                                </div>
+                                <p class="text-xs text-gray-400 mt-1">Department ditentukan secara otomatis berdasarkan akun Anda.</p>
+                            @endif
                         </div>
-                        
+
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Request Type</label>
                             <div class="mt-2 space-x-4">
@@ -62,11 +67,6 @@
                             <label class="block text-sm font-medium text-gray-700">Total Amount</label>
                             <input type="text" id="total_amount" class="mt-1 block w-full rounded-md border-gray-200 bg-gray-100 text-gray-500" readonly>
                         </div>
-                        
-                        <div class="flex items-center pt-6">
-                            <input type="checkbox" name="code_budget_ditanam" value="1" checked id="code_budget_ditanam" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                            <label for="code_budget_ditanam" class="ml-2 block text-sm text-gray-900">Is Budgeted (Dianggarkan)</label>
-                        </div>
                     </div>
 
                     <script>
@@ -87,17 +87,59 @@
 
                     <!-- Budget Selection -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Select Budget / Asset</label>
-                        <select name="capex_budget_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
-                            <option value="">-- Choose Asset Budget --</option>
+                        <label class="block text-sm font-medium text-gray-700">Pilih Budget / Aset</label>
+
+                        <select id="capex_budget_select" name="capex_budget_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+                            <option value="">-- Pilih Aset Budget --</option>
                             @foreach($budgets as $budget)
-                                <option value="{{ $budget->id }}">
-                                    [{{ $budget->budget_code }}] {{ $budget->capexAsset->name }} (Remaining: Rp {{ number_format($budget->remaining_amount, 0) }})
+                                <option value="{{ $budget->id }}" data-dept="{{ $budget->department_id }}">
+                                    [{{ $budget->budget_code }}] {{ $budget->capexAsset->name }} — {{ $budget->department->name }} (Sisa: Rp {{ number_format($budget->remaining_amount, 0) }})
                                 </option>
                             @endforeach
                         </select>
-                        <p class="text-xs text-gray-500 mt-1">Select the locked budget item for this request.</p>
+
+                        <p id="budget_hint" class="text-xs text-gray-500 mt-1">
+                            Menampilkan budget aktif tahun {{ date('Y') }}.
+                        </p>
+
+                        @if($isAdmin)
+                        <script>
+                            const deptSelect = document.getElementById('departmentSelect');
+                            const budgetSelect = document.getElementById('capex_budget_select');
+                            const budgetHint = document.getElementById('budget_hint');
+
+                            function filterBudgets() {
+                                const selectedDeptId = deptSelect ? deptSelect.value : null;
+                                const options = budgetSelect.querySelectorAll('option[data-dept]');
+                                let visibleCount = 0;
+
+                                options.forEach(opt => {
+                                    if (!selectedDeptId || opt.dataset.dept === selectedDeptId) {
+                                        opt.style.display = '';
+                                        visibleCount++;
+                                    } else {
+                                        opt.style.display = 'none';
+                                        // Reset selection if hidden
+                                        if (opt.selected) {
+                                            budgetSelect.value = '';
+                                        }
+                                    }
+                                });
+
+                                // Update hint text with selected dept name
+                                const selectedDeptText = deptSelect ? (deptSelect.options[deptSelect.selectedIndex]?.text ?? '') : '';
+                                budgetHint.innerHTML = `Menampilkan budget aktif tahun {{ date('Y') }} untuk department <strong>${selectedDeptText}</strong> (${visibleCount} tersedia).`;
+                            }
+
+                            if (deptSelect) {
+                                deptSelect.addEventListener('change', filterBudgets);
+                                // Trigger immediately on page load
+                                filterBudgets();
+                            }
+                        </script>
+                        @endif
                     </div>
+
 
                     <!-- Description -->
                     <div>
@@ -134,7 +176,6 @@
                         </button>
                     </div>
                 </form>
-                @endif
             </div>
         </div>
     </div>

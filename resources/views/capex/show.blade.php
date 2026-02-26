@@ -56,7 +56,20 @@
                     
                     <div class="text-gray-500">Budget Item</div>
                     <div class="font-medium">{{ $capex->capexBudget->budget_code }} - {{ $capex->capexBudget->capexAsset->name }}</div>
-                    
+
+                    <div class="text-gray-500">Status Anggaran</div>
+                    <div>
+                        @if($capex->code_budget_ditanam)
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200">
+                                ✓ Dianggarkan (Budgeted)
+                            </span>
+                        @else
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800 border border-yellow-200">
+                                ⚠ Tidak Dianggarkan (Unbudgeted)
+                            </span>
+                        @endif
+                    </div>
+
                     <div class="text-gray-500">Amount</div>
                     <div class="font-bold text-lg">Rp {{ number_format($capex->amount, 0) }}</div>
 
@@ -122,7 +135,7 @@
                          </button>
                          <button type="submit" 
                                  formaction="{{ route('capex.approve', $capex) }}"
-                                 class="px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition shadow-md hover:shadow-lg focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 flex items-center gap-2">
+                                 class="px-6 py-2.5 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition shadow-md hover:shadow-lg focus:ring-2 focus:ring-green-500 focus:ring-offset-2 flex items-center gap-2">
                              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                              Approve & Sign
                          </button>
@@ -183,8 +196,8 @@
                 </div>
              </div>
         @elseif(!$canApprove && $capex->status == 'Pending')
-            <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mt-6 text-center">
-                <p class="text-blue-800 text-sm italic">Menunggu giliran approval (Level {{ $capex->current_step }}).</p>
+            <div class="bg-green-50 border border-green-200 rounded-xl p-4 mt-6 text-center">
+                <p class="text-green-800 text-sm italic font-medium">Menunggu giliran approval (Level {{ $capex->current_step }}).</p>
             </div>
         @endif
 
@@ -214,11 +227,11 @@
 
                     <div class="relative pb-8">
                         @if($i < 5) 
-                            <span class="absolute top-4 left-4 -ml-px h-full w-0.5 {{ $isPast ? 'bg-indigo-600' : 'bg-gray-200' }}" aria-hidden="true"></span>
+                            <span class="absolute top-4 left-4 -ml-px h-full w-0.5 {{ $isPast ? 'bg-green-600' : 'bg-gray-200' }}" aria-hidden="true"></span>
                         @endif
                         <div class="relative flex space-x-3">
                             <div>
-                                <span class="h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white {{ $status == 'Approved' ? 'bg-green-500' : ($status == 'Rejected' ? 'bg-red-500' : ($isCurrent ? 'bg-indigo-600 animate-pulse' : 'bg-gray-200')) }}">
+                                <span class="h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white {{ $status == 'Approved' ? 'bg-green-500' : ($status == 'Rejected' ? 'bg-red-500' : ($isCurrent ? 'bg-green-600 animate-pulse' : 'bg-gray-200')) }}">
                                     @if($status == 'Approved')
                                        <svg class="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor">
                                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
@@ -230,7 +243,7 @@
                             </div>
                             <div class="min-w-0 flex-1 pt-1.5 ">
                                 <p class="text-sm font-medium text-gray-900">
-                                    Column {{ $i }} ({{ $approverLabel }})
+                                    Approver {{ $i }} ({{ $approverLabel }})
                                 </p>
                                 <div class="mt-1">
                                     @if($status === 'Approved')
@@ -276,7 +289,7 @@
                     $hasWetFile     = (bool) $capex->signed_file_path;
                     $dotWetColor    = $capex->is_verified
                         ? 'border-green-500 bg-green-500'
-                        : ($hasWetFile ? 'border-blue-500 bg-blue-100' : 'border-gray-300 bg-gray-100');
+                        : ($hasWetFile ? 'border-green-500 bg-green-100' : 'border-gray-300 bg-gray-100');
                 @endphp
                 <div class="relative">
                     <div class="absolute -left-[31px] border-2 {{ $dotWetColor }} w-4 h-4 rounded-full"></div>
@@ -294,7 +307,7 @@
                             @if($hasWetFile)
                                 <div class="mt-2 flex flex-wrap gap-2">
                                     <a href="{{ asset('storage/' . $capex->signed_file_path) }}" target="_blank"
-                                       class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 transition">
+                                       class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100 transition">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                                         View File
                                     </a>
@@ -320,7 +333,7 @@
                                             Verified
                                         </span>
                                         @if($capex->pr_id)
-                                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg">PR Created</span>
+                                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-green-50 text-green-700 border border-green-200 rounded-lg">PR Created</span>
                                         @endif
                                     @endif
                                 </div>

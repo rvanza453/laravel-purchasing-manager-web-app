@@ -44,8 +44,8 @@ class ApprovalController extends Controller
             return $allPreviousApproved && in_array($approval->status, ['Pending', 'On Hold']);
         });
 
-        // 2. Get Capex Approvals (Digital Only)
-        $capexQuery = \App\Models\CapexApproval::where('status', 'Pending')
+        // 2. Get Capex Approvals (Digital Only) - include On Hold
+        $capexQuery = \App\Models\CapexApproval::whereIn('status', ['Pending', 'On Hold'])
             ->with(['capexRequest.user', 'capexRequest.department', 'capexRequest.capexBudget.capexAsset']);
             
         if (!auth()->user()->hasRole('Admin')) {
@@ -58,8 +58,8 @@ class ApprovalController extends Controller
             // BUT, for simplicity in this iteration, let's assume we filter by ID if set, or we fetch all and filter in PHP.
         }
         
-        // Fetching all pending capex approvals to filter by logic
-        $allCapexApprovals = \App\Models\CapexApproval::where('status', 'Pending')
+        // Fetching all pending/on-hold capex approvals to filter by logic
+        $allCapexApprovals = \App\Models\CapexApproval::whereIn('status', ['Pending', 'On Hold'])
              ->with(['capexRequest', 'capexRequest.user'])
              ->get();
              
