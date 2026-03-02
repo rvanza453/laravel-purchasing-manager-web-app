@@ -33,9 +33,8 @@ class FonnteService
                 'countryCode' => $countryCode,
             ];
 
-            if ($delay) {
-                $body['delay'] = $delay;
-            }
+            // Note: Fonnte API does not support a 'delay' parameter in the request body.
+            // Staggered delays should be managed by the caller (e.g., using sleep()).
 
             Log::info("Sending Fonnte WA to $target: $message");
 
@@ -46,11 +45,19 @@ class FonnteService
               ->post('https://api.fonnte.com/send', $body);
 
             if ($response->successful()) {
+                $json = $response->json();
                 Log::info('Fonnte Response: ' . $response->body());
-                return $response->json();
+                
+                // Even if HTTP is 200, check the Fonnte-specific 'status' flag
+                if (isset($json['status']) && $json['status'] === false) {
+                    $reason = $json['reason'] ?? 'Unknown Fonnte Error';
+                    throw new \Exception("Fonnte API returned false status: $reason");
+                }
+                
+                return $json;
             } else {
                 Log::error('Fonnte Error: ' . $response->body());
-                return false;
+                throw new \Exception("HTTP Error: " . $response->status());
             }
 
         } catch (\Exception $e) {

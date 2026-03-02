@@ -39,16 +39,16 @@
                             <label class="block text-sm font-medium text-gray-700">Request Type</label>
                             <div class="mt-2 space-x-4">
                                 <label class="inline-flex items-center">
-                                    <input type="radio" name="type" value="New" class="form-radio text-indigo-600" checked>
-                                    <span class="ml-2">New</span>
+                                    <input type="radio" name="type" value="Baru" class="form-radio text-indigo-600" checked>
+                                    <span class="ml-2">Baru</span>
                                 </label>
                                 <label class="inline-flex items-center">
-                                    <input type="radio" name="type" value="Modification" class="form-radio text-indigo-600">
-                                    <span class="ml-2">Modification</span>
+                                    <input type="radio" name="type" value="Perbaikan" class="form-radio text-indigo-600">
+                                    <span class="ml-2">Perbaikan</span>
                                 </label>
                                 <label class="inline-flex items-center">
-                                    <input type="radio" name="type" value="Replacement" class="form-radio text-indigo-600">
-                                    <span class="ml-2">Replacement</span>
+                                    <input type="radio" name="type" value="Penggantian" class="form-radio text-indigo-600">
+                                    <span class="ml-2">Penggantian</span>
                                 </label>
                             </div>
                         </div>
@@ -92,8 +92,10 @@
                         <select id="capex_budget_select" name="capex_budget_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
                             <option value="">-- Pilih Aset Budget --</option>
                             @foreach($budgets as $budget)
-                                <option value="{{ $budget->id }}" data-dept="{{ $budget->department_id }}">
-                                    [{{ $budget->budget_code }}] {{ $budget->capexAsset->name }} — {{ $budget->department->name }} (Sisa: Rp {{ number_format($budget->remaining_amount, 0) }})
+                                <!-- <option value="{{ $budget->id }}" data-dept="{{ $budget->department_id }}"> -->
+                                <option value="{{ $budget->id }}" >
+                                    [{{ $budget->budget_code }}] {{ $budget->capexAsset->name }} — {{ $budget->department->name }} 
+                                    (Limit: Rp {{ number_format($budget->amount + $budget->pta_amount, 0) }}{{ $budget->pta_amount > 0 ? ' incl PTA' : '' }} | Sisa: Rp {{ number_format($budget->remaining_amount, 0) }})
                                 </option>
                             @endforeach
                         </select>

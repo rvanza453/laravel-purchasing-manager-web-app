@@ -12,6 +12,7 @@ class CapexBudget extends Model
         'capex_asset_id',
         'budget_code',
         'amount',
+        'pta_amount',
         'remaining_amount',
         'original_quantity',
         'remaining_quantity',

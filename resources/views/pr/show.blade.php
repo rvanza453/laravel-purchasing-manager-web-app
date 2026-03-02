@@ -660,7 +660,7 @@
                         </div>
                         @if($approval->remarks)
                             <div class="mt-2 text-sm text-orange-700 bg-orange-50 p-2 rounded border border-orange-100">
-                                <span class="text-xs font-semibold uppercase text-orange-500">⏸ Catatan Hold:</span>
+                                <span class="text-xs font-semibold uppercase text-orange-500">⏸ Catatan :</span>
                                 "<i>{{ $approval->remarks }}</i>"
                             </div>
                         @endif

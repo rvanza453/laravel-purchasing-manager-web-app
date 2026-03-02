@@ -64,10 +64,9 @@ class SendDailyPendingPrNotifications extends Command
         // 3. Sort by level ascending so lowest-level approver is contacted first
         uasort($notifications, fn($a, $b) => $a['level'] <=> $b['level']);
 
-        // 4. Send with staggered delay (10 minutes per recipient)
-        $count       = 0;
-        $delayStep   = 10 * 60; // 600 seconds = 10 minutes
-        $currentDelay = 0;      // First recipient has no delay
+        // 4. Send with staggered delay (10 minutes between each send to avoid WA spam ban)
+        $count = 0;
+        $isFirst = true;
 
         foreach ($notifications as $approverId => $data) {
             $user = $data['user'];
@@ -94,14 +93,20 @@ class SendDailyPendingPrNotifications extends Command
             $message = $this->buildMessage($user->name, $total, $prList);
 
             try {
-                $this->fonnteService->sendMessage($user->phone_number, $message, $currentDelay);
-                $delayMinutes = $currentDelay / 60;
-                $this->info("Queued notification to {$user->name} (Level {$data['level']}, delay {$delayMinutes} mnt, {$total} PRs)");
+                // Wait 10 seconds between sends to avoid WA spam
+                if (!$isFirst) {
+                    $this->info("Waiting 10 seconds before next send...");
+                    sleep(20);
+                }
+
+                $this->fonnteService->sendMessage($user->phone_number, $message);
+                $this->info("Sent notification to {$user->name} (Level {$data['level']}, {$total} PRs)");
                 $count++;
-                $currentDelay += $delayStep;
+                $isFirst = false;
             } catch (\Exception $e) {
                 $this->error("Failed to send to {$user->name}: " . $e->getMessage());
                 Log::error('Fonnte Daily Job Error: ' . $e->getMessage());
+                $isFirst = false;
             }
         }
 
@@ -157,7 +162,7 @@ class SendDailyPendingPrNotifications extends Command
             $callToAction,
 
             // Variant 5
-            "Selamat beraktivitas, {$name}!\n\n" .
+            "Selamat bekerja, {$name}!\n\n" .
             "🔔 Jangan lupa, ada *{$prWord}* yang masih menunggu approval Anda:\n\n" .
             $prList . "\n" .
             "Login dan tinjau melalui: {$url}\n\n" .

@@ -71,7 +71,7 @@
                                 <label for="status" class="block text-xs font-medium text-gray-700 mb-1.5">Status Approval</label>
                                 <select name="status" id="status" class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm" onchange="this.form.submit()">
                                     <option value="">Semua</option>
-                                    @foreach(['Pending', 'On Hold', 'Approved', 'Rejected'] as $stat)
+                                    @foreach(['Pending', 'On Hold', 'Approved', 'Waiting PO', 'Complete PO', 'Rejected'] as $stat)
                                         <option value="{{ $stat }}" {{ request('status') == $stat ? 'selected' : '' }}>{{ $stat }}</option>
                                     @endforeach
                                 </select>

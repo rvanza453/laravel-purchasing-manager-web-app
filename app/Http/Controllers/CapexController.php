@@ -100,7 +100,9 @@ class CapexController extends Controller
 
         if ($isBudgeted) {
             if ($budget->remaining_amount < $totalAmount) {
-                return back()->with('error', 'Jumlah permintaan (Rp ' . number_format($totalAmount, 0) . ') melebihi sisa anggaran (Rp ' . number_format($budget->remaining_amount, 0) . ')');
+                $limitText = number_format($budget->amount + $budget->pta_amount, 0);
+                $ptaText = $budget->pta_amount > 0 ? ' (termasuk PTA Rp ' . number_format($budget->pta_amount, 0) . ')' : '';
+                return back()->with('error', 'Jumlah total permintaan (Rp ' . number_format($totalAmount, 0) . ') melebihi sisa anggaran yang tersedia (Rp ' . number_format($budget->remaining_amount, 0) . ') dari total limit Rp ' . $limitText . $ptaText);
             }
             if (isset($budget->remaining_quantity) && $budget->remaining_quantity < $validated['quantity']) {
                 return back()->with('error', 'Jumlah unit (' . $validated['quantity'] . ') melebihi sisa jumlah anggaran (' . $budget->remaining_quantity . ')');
@@ -116,7 +118,7 @@ class CapexController extends Controller
                 'price'               => $validated['price'],
                 'amount'              => $totalAmount,
                 'type'                => $validated['type'],
-                'code_budget_ditanam' => $isBudgeted, // Inherited from the budget's is_budgeted flag
+                'code_budget_ditanam' => $isBudgeted, 
                 'description'         => $validated['description'],
                 'questionnaire_answers' => $validated['questionnaire'],
                 'status'              => 'Pending',
@@ -335,7 +337,15 @@ class CapexController extends Controller
         // Update Capex Status (STOP PROCESS)
         $capex->update(['status' => 'Rejected']);
 
-        return back()->with('success', 'Capex Request Rejected.');
+        // Refund Budget if it was budgeted
+        if ($capex->code_budget_ditanam && $capex->capexBudget) {
+            $capex->capexBudget->increment('remaining_amount', $capex->amount);
+            if (isset($capex->capexBudget->remaining_quantity)) {
+                $capex->capexBudget->increment('remaining_quantity', $capex->quantity);
+            }
+        }
+
+        return back()->with('success', 'Capex Request Rejected and Budget has been refunded.');
     }
 
     public function hold(\Illuminate\Http\Request $request, \App\Models\CapexRequest $capex)

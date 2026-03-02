@@ -61,4 +61,17 @@ class CapexBudgetController extends Controller
         $budget->delete();
         return redirect()->route('admin.capex.budgets.index')->with('success', 'Capex Budget Deleted Successfully');
     }
+
+    public function addPta(Request $request, \App\Models\CapexBudget $budget)
+    {
+        $validated = $request->validate([
+            'pta_amount' => 'required|numeric|min:1',
+        ]);
+
+        $budget->pta_amount += $validated['pta_amount'];
+        $budget->remaining_amount += $validated['pta_amount'];
+        $budget->save();
+
+        return redirect()->route('admin.capex.budgets.index')->with('success', 'PTA (Tambahan Anggaran) berhasil ditambahkan.');
+    }
 }

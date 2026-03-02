@@ -61,11 +61,11 @@
                     <div>
                         @if($capex->code_budget_ditanam)
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200">
-                                ✓ Dianggarkan (Budgeted)
+                                ✓ Dianggarkan (Budgeted){{ $capex->capexBudget->pta_amount > 0 ? ' + PTA' : '' }}
                             </span>
                         @else
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800 border border-yellow-200">
-                                ⚠ Tidak Dianggarkan (Unbudgeted)
+                                ⚠ Tidak Dianggarkan (Unbudgeted){{ $capex->capexBudget->pta_amount > 0 ? ' + PTA' : '' }}
                             </span>
                         @endif
                     </div>
@@ -103,6 +103,62 @@
                     @endforeach
                 </div>
             </div>
+        </div>
+
+        <!-- Informasi Anggaran Card -->
+        @php
+            $budgetAwal = ($capex->capexBudget->amount ?? 0) + ($capex->capexBudget->pta_amount ?? 0);
+            $usulan     = $capex->amount;
+            
+            // Capex yang disetujui sebelumnya: Kalkulasi total pengajuan capex dari budget ini sebelum capex saat ini dibuat
+            $capexSebelumnya = 0;
+            if ($capex->code_budget_ditanam && $capex->capexBudget) {
+                $capexSebelumnya = \App\Models\CapexRequest::where('capex_budget_id', $capex->capex_budget_id)
+                                ->where('id', '<', $capex->id)
+                                ->where('status', '!=', 'Rejected')
+                                ->sum('amount');
+            }
+            
+            // Saldo Anggaran yang dapat dipakai (sehingga capex ini bisa diajukan)
+            $saldoDapatDipakai = $capex->code_budget_ditanam ? ($budgetAwal - $capexSebelumnya) : 0;
+            
+            // Over / Under setelah usulan ini
+            $overUnder = $capex->code_budget_ditanam ? ($saldoDapatDipakai - $usulan) : (0 - $usulan);
+            $sisaAkhir = $overUnder;
+        @endphp
+        <div class="bg-white p-6 rounded-lg shadow-sm">
+            <h4 class="font-bold border-b pb-2 mb-4 text-gray-800">Informasi Anggaran</h4>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-6 text-sm">
+                <div>
+                    <div class="text-gray-500 mb-1">Anggaran yang Disetujui</div>
+                    <div class="font-bold text-gray-800">Rp {{ number_format($budgetAwal, 0, ',', '.') }}</div>
+                </div>
+                <div>
+                    <div class="text-gray-500 mb-1">Capex yang Disetujui Sebelumnya</div>
+                    <div class="font-bold text-red-600">Rp {{ number_format($capexSebelumnya, 0, ',', '.') }}</div>
+                </div>
+                <div>
+                    <div class="text-gray-500 mb-1">Saldo Anggaran yang Dapat Dipakai</div>
+                    <div class="font-bold text-blue-600 border-b-2 border-dashed border-gray-200 pb-2">Rp {{ number_format($saldoDapatDipakai, 0, ',', '.') }}</div>
+                </div>
+                <div>
+                    <div class="text-gray-500 mb-1">Nilai Usulan Pembelian</div>
+                    <div class="font-bold text-orange-600">Rp {{ number_format($usulan, 0, ',', '.') }}</div>
+                </div>
+                <div>
+                    <div class="text-gray-500 mb-1">Over / Under</div>
+                    <div class="font-bold text-gray-800">Rp {{ number_format($overUnder, 0, ',', '.') }}</div>
+                </div>
+                <div>
+                    <div class="text-gray-500 mb-1">Sisa Saldo Anggaran</div>
+                    <div class="font-bold text-green-600 text-lg">Rp {{ number_format($sisaAkhir, 0, ',', '.') }}</div>
+                </div>
+            </div>
+            @if(!$capex->code_budget_ditanam)
+            <div class="mt-4 px-3 py-2 bg-yellow-50 text-yellow-800 text-xs rounded border border-yellow-200">
+                Capex ini ditandai sebagai <b>Tidak Dianggarkan (Unbudgeted)</b>. Kalkulasi saldo budget tidak mengurangi nilai sisa budget aktual.
+            </div>
+            @endif
         </div>
 
         @if($canApprove && $capex->status != 'Rejected')

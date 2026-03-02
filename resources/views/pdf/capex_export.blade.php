@@ -119,16 +119,24 @@
         // $getConfig = fn($index) => \App\Models\CapexColumnConfig::where('department_id', $capex->department_id)->where('column_index', $index)->first();
 
         // Helper Budget Figures
-        $budgetAwal = $capex->capexBudget->amount ?? 0;
+        $budgetAwal = ($capex->capexBudget->amount ?? 0) + ($capex->capexBudget->pta_amount ?? 0);
         $usulan     = $capex->amount;
-        $sisaAkhir  = $capex->capexBudget->remaining_amount ?? 0;
         
-        // Logic: "Saldo Yang Dapat Dipakai" = Sisa Akhir SAAT INI + Usulan (karena sisa akhir DB sudah terpotong usulan ini)
-        // Adjust logic based on your system update timing. Assuming 'remaining_amount' in DB is AFTER deduction.
-        $saldoDapatDipakai = $capex->code_budget_ditanam ? ($sisaAkhir + $usulan) : 0;
+        // Capex yang disetujui sebelumnya: Kalkulasi total pengajuan capex dari budget ini sebelum capex saat ini dibuat
+        $capexSebelumnya = 0;
+        if ($capex->code_budget_ditanam && $capex->capexBudget) {
+            $capexSebelumnya = \App\Models\CapexRequest::where('capex_budget_id', $capex->capex_budget_id)
+                            ->where('id', '<', $capex->id)
+                            ->where('status', '!=', 'Rejected')
+                            ->sum('amount');
+        }
         
-        // "Capex disetujui sebelumnya" = Budget Awal - Saldo Dapat Dipakai
-        $capexSebelumnya = $budgetAwal - $saldoDapatDipakai;
+        // Saldo Anggaran yang dapat dipakai (sehingga capex ini bisa diajukan)
+        $saldoDapatDipakai = $capex->code_budget_ditanam ? ($budgetAwal - $capexSebelumnya) : 0;
+        
+        // Over / Under setelah usulan ini
+        $overUnder = $capex->code_budget_ditanam ? ($saldoDapatDipakai - $usulan) : (0 - $usulan);
+        $sisaAkhir = $overUnder;
 
         $answers = $capex->questionnaire_answers ?? [];
         
@@ -182,7 +190,7 @@
     <!-- PAGE 1: JUSTIFIKASI -->
     
     <div style="border: 1px solid #000;">
-        <div class="justifikasi-header">Justifikasi</div>
+        <div class="justifikasi-header">Justifikasi CAPEX</div>
         
         <!-- Q1 -->
         <div style="border-bottom: 1px solid #000; padding: 5px;">
@@ -347,19 +355,19 @@
         <tr>
             <td width="33%">
                 <div style="border: 1px solid #000; width: 20px; height: 20px; display: inline-block; vertical-align: middle; text-align: center;">
-                    {{ $capex->type == 'New' ? 'V' : '' }}
+                    {{ $capex->type == 'Baru' ? '✔' : '' }}
                 </div> 
-                New Capex
+                Baru
             </td>
             <td width="33%">
                 <div style="border: 1px solid #000; width: 60px; height: 20px; display: inline-block; vertical-align: middle; text-align: center;">
-                     {{ $capex->type == 'Modification' ? 'V' : '' }}
+                     {{ $capex->type == 'Perbaikan' ? '✔' : '' }}
                 </div> 
-                Modifikasi
+                Perbaikan
             </td>
             <td width="33%">
                 <div style="border: 1px solid #000; width: 40px; height: 20px; display: inline-block; vertical-align: middle; text-align: center;">
-                     {{ $capex->type == 'Replacement' ? 'V' : '' }}
+                     {{ $capex->type == 'Penggantian' ? '✔' : '' }}
                 </div> 
                 Penggantian
             </td>
@@ -402,13 +410,13 @@
                                 <div>
                                     Dianggarkan: 
                                     <span style="display: inline-block; border: 1px solid #000; width: 14px; height: 14px; text-align: center; margin-left: 5px; vertical-align: middle; line-height: 14px;">
-                                        {{ $capex->is_budgeted ? 'v' : '' }}
+                                        {{ $capex->is_budgeted ? '✔' : '' }}
                                     </span>
                                 </div>
                                 <div>
                                     Tidak Dianggarkan: 
                                     <span style="display: inline-block; border: 1px solid #000; width: 14px; height: 14px; text-align: center; margin-left: 5px; vertical-align: middle; line-height: 14px;">
-                                        {{ !$capex->is_budgeted ? 'v' : '' }}
+                                        {{ !$capex->is_budgeted ? '✔' : '' }}
                                     </span>
                                 </div>
                             </div>
@@ -570,7 +578,7 @@
         <!-- Row 1 -->
         <tr>
             <td width="30%">Nilai Anggaran</td>
-            <td width="30%">Budget assets</td>
+            <td width="30%">{{ number_format($budgetAwal, 0, ',', '.') }}</td>
             <td rowspan="4" style="vertical-align: bottom; text-align: right; padding-right: 10px;">
                  General Manager PT. SSM
                  <div style="height: 100px; text-align: right; position: relative;">
@@ -586,25 +594,25 @@
         <!-- Row 2 -->
         <tr>
             <td>Sisa Saldo Anggaran yang dapat di pakai</td>
-            <td>sisa budget</td>
+            <td>{{ number_format($saldoDapatDipakai, 0, ',', '.') }}</td>
         </tr>
 
         <!-- Row 3 -->
         <tr>
             <td>Nilai Usulan Pembelian</td>
-            <td>usulan harga</td>
+            <td>{{ number_format($usulan, 0, ',', '.') }}</td>
         </tr>
 
          <!-- Row 4 -->
          <tr>
             <td>Over/Under</td>
-            <td>Anggaran - Usulan</td>
+            <td>{{ number_format($saldoDapatDipakai - $usulan, 0, ',', '.') }}</td>
         </tr>
 
         <!-- Row 5 -->
         <tr>
-            <td>Sisa Saldo Anggaran (Anggaran - Realisasi)</td>
-            <td></td>
+            <td>Sisa Saldo Anggaran</td>
+            <td>{{ number_format($sisaAkhir, 0, ',', '.') }}</td>
             <td rowspan="6" style="vertical-align: top; padding: 10px;">
                 KOMENTAR :
             </td>

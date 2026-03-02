@@ -85,6 +85,17 @@ class PrController extends Controller
                 $query->whereHas('purchaseRequest', function($q) use ($status) {
                     if ($status === \App\Enums\PrStatus::PENDING->value) {
                         $q->whereIn('status', [\App\Enums\PrStatus::PENDING->value, \App\Enums\PrStatus::ON_HOLD->value]);
+                    } elseif ($status === 'Waiting PO') {
+                        // Includes both purely Waiting PO and Partial PO (not fully complete)
+                        $q->whereIn('status', ['Approved', 'PO Created'])
+                          ->whereDoesntHave('items', function ($iq) {
+                              $iq->havingRaw('COUNT(id) = (SELECT COUNT(pr_item_id) FROM po_items WHERE po_items.pr_item_id = pr_items.id)');
+                          });
+                    } elseif ($status === 'Complete PO') {
+                        $q->whereIn('status', ['Approved', 'PO Created'])
+                          ->whereDoesntHave('items', function ($iq) {
+                              $iq->whereDoesntHave('poItems');
+                          });
                     } else {
                         $q->where('status', $status);
                     }
@@ -135,6 +146,19 @@ class PrController extends Controller
             if ($request->filled('status')) {
                 if ($request->status === \App\Enums\PrStatus::PENDING->value) {
                     $query->whereIn('status', [\App\Enums\PrStatus::PENDING->value, \App\Enums\PrStatus::ON_HOLD->value]);
+                } elseif ($request->status === 'Waiting PO') {
+                    // Includes both purely Waiting PO and Partial PO
+                    $query->whereIn('status', ['Approved', 'PO Created'])
+                          ->whereHas('items', function ($iq) {
+                              $iq->whereDoesntHave('poItems');
+                          });
+                } elseif ($request->status === 'Complete PO') {
+                    // ALL items must have a PO
+                    $query->whereIn('status', ['Approved', 'PO Created'])
+                          ->whereHas('items') // Ensure it has items
+                          ->whereDoesntHave('items', function ($iq) {
+                              $iq->whereDoesntHave('poItems');
+                          });
                 } else {
                     $query->where('status', $request->status);
                 }
@@ -309,6 +333,17 @@ class PrController extends Controller
                     $itemQuery->whereHas('purchaseRequest', function($q) use ($status) {
                         if ($status === \App\Enums\PrStatus::PENDING->value) {
                             $q->whereIn('status', [\App\Enums\PrStatus::PENDING->value, \App\Enums\PrStatus::ON_HOLD->value]);
+                        } elseif ($status === 'Waiting PO') {
+                            $q->whereIn('status', ['Approved', 'PO Created'])
+                              ->whereHas('items', function ($iq) {
+                                  $iq->whereDoesntHave('poItems');
+                              });
+                        } elseif ($status === 'Complete PO') {
+                            $q->whereIn('status', ['Approved', 'PO Created'])
+                              ->whereHas('items')
+                              ->whereDoesntHave('items', function ($iq) {
+                                  $iq->whereDoesntHave('poItems');
+                              });
                         } else {
                             $q->where('status', $status);
                         }

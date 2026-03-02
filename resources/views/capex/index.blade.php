@@ -21,7 +21,7 @@
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Capex Number</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Step</th>
@@ -33,16 +33,28 @@
                                     <tr>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-indigo-600">
                                             <a href="{{ route('capex.show', $capex) }}">{{ $capex->capex_number }}</a>
-                                            <div class="text-xs text-gray-400">{{ $capex->created_at->format('d M Y') }}</div>
+                                            <div class="text-xs text-gray-400 mt-1">{{ $capex->created_at->format('d M Y') }}</div>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {{ $capex->department->name ?? '-' }}
                                         </td>
-                                        <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate" title="{{ $capex->description }}">
-                                            {{ $capex->description }}
+                                        <td class="px-6 py-4 text-sm text-gray-500 max-w-xs" title="{{ $capex->description }}">
+                                            <div class="font-bold text-gray-900">{{ $capex->capexBudget->capexAsset->name ?? '-' }}</div>
+                                            <div class="mt-1 text-xs truncate" title="{{ $capex->description }}">{{ $capex->description }}</div>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">
                                             Rp {{ number_format($capex->amount, 0) }}
+                                            <div class="mt-1 font-normal">
+                                                @if($capex->code_budget_ditanam)
+                                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-100 text-green-800 border border-green-200">
+                                                        ✓ Dianggarkan{{ $capex->capexBudget->pta_amount > 0 ? ' + PTA' : '' }}
+                                                    </span>
+                                                @else
+                                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-yellow-100 text-yellow-800 border border-yellow-200">
+                                                        ⚠ Tidak Dianggarkan{{ $capex->capexBudget->pta_amount > 0 ? ' + PTA' : '' }}
+                                                    </span>
+                                                @endif
+                                            </div>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 

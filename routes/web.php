@@ -166,6 +166,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware(['role:Admin'])->prefix('admin')->name('admin.')->group(function () {
         Route::resource('capex/assets', \App\Http\Controllers\CapexAssetController::class)->names('capex.assets');
         Route::resource('capex/budgets', \App\Http\Controllers\CapexBudgetController::class)->names('capex.budgets');
+        Route::post('capex/budgets/{budget}/pta', [\App\Http\Controllers\CapexBudgetController::class, 'addPta'])->name('capex.budgets.pta');
         Route::get('capex/config', [\App\Http\Controllers\CapexConfigController::class, 'index'])->name('capex.config.index');
         Route::get('capex/config/{department}/edit', [\App\Http\Controllers\CapexConfigController::class, 'edit'])->name('capex.config.edit');
         Route::put('capex/config/{department}', [\App\Http\Controllers\CapexConfigController::class, 'update'])->name('capex.config.update');
@@ -210,7 +211,7 @@ Route::get('/maintenance-off', function() {
     }
 });
 
-Route::get('/test-notification', function() {
+Route::get('/send-notification', function() {
     if (!auth()->check() || !auth()->user()->hasRole('Admin')) {
         abort(403, 'Unauthorized');
     }
@@ -218,11 +219,11 @@ Route::get('/test-notification', function() {
     try {
         \Illuminate\Support\Facades\Artisan::call('pr:notify-pending');
         $output = \Illuminate\Support\Facades\Artisan::output();
-        return "<h2>Notification Test Completed</h2><pre>" . $output . "</pre><br><a href='/dashboard'>Back to Dashboard</a>";
+        return "<h2>✅ Notification Test Completed</h2><pre>" . $output . "</pre><br><a href='/dashboard'>← Back to Dashboard</a>";
     } catch (\Exception $e) {
         return "Error: " . $e->getMessage();
     }
-})->middleware('auth');
+});
 
 
 
