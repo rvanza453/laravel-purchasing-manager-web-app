@@ -39,7 +39,31 @@ class ImportWarehouseStock extends Command
         $this->info("Starting import for Warehouse ID: $warehouseId from file: $file");
 
         $handle = fopen($file, 'r');
-        $header = fgetcsv($handle); 
+        
+        // === SMART DELIMITER DETECTION ===
+        // Read the first line to detect the delimiter used.
+        // Priority: TAB > Semicolon > Comma
+        // Using TAB or Semicolon as delimiter allows numbers like 362,131.00 
+        // to be read as a single field (not split by the comma).
+        $firstLine = fgets($handle);
+        rewind($handle);
+
+        $tabCount       = substr_count($firstLine, "\t");
+        $semicolonCount = substr_count($firstLine, ';');
+        $commaCount     = substr_count($firstLine, ',');
+
+        if ($tabCount >= $semicolonCount && $tabCount >= $commaCount && $tabCount > 0) {
+            $delimiter = "\t";
+            $this->info("Detected Delimiter: TAB");
+        } elseif ($semicolonCount > $commaCount) {
+            $delimiter = ';';
+            $this->info("Detected Delimiter: Semicolon (;)");
+        } else {
+            $delimiter = ',';
+            $this->info("Detected Delimiter: Comma (,) — WARNING: numbers with commas may be split!");
+        }
+
+        $header = fgetcsv($handle, 4096, $delimiter);
         
         // Detect Column Mapping
         // Check if first column is empty (Original CSV format) or ITEM ID (KDE CSV format)
@@ -67,7 +91,7 @@ class ImportWarehouseStock extends Command
         DB::beginTransaction();
 
         try {
-            while (($row = fgetcsv($handle)) !== false) {
+            while (($row = fgetcsv($handle, 4096, $delimiter)) !== false) {
                 
                 $code = trim($row[$idxCode] ?? '');
                 if (empty($code)) {
@@ -140,23 +164,63 @@ class ImportWarehouseStock extends Command
 
     private function sanitizeNumber($value, $isInteger = false)
     {
-        if (is_numeric($value)) {
-            return $isInteger ? (int)round($value) : $value;
-        }
+        $value = trim($value);
 
-        // Handle "NaN" or "Infinity"
-        if (strcasecmp($value, 'NaN') === 0 || strcasecmp($value, 'Infinity') === 0) {
+        // Handle "NaN" or "Infinity" or empty
+        if (empty($value) || strcasecmp($value, 'NaN') === 0 || strcasecmp($value, 'Infinity') === 0) {
             return 0;
         }
 
-        // Remove commas (thousands separator)
-        $clean = str_replace(',', '', $value);
-        
-        // Remove quotes if any
-        $clean = str_replace(['"', "'"], '', $clean);
+        // Remove currency symbols, quotes, spaces
+        $value = str_replace(['Rp', '"', "'", ' ', "\xA0"], '', $value);
+        $value = trim($value);
+
+        // If already a plain number, return directly
+        if (is_numeric($value)) {
+            return $isInteger ? (int)round((float)$value) : (float)$value;
+        }
+
+        // Determine number format:
+        // Case 1: Anglo format  → 1,423.00  (dot = decimal, comma = thousands)
+        // Case 2: ID/EU format  → 1.423,00  (comma = decimal, dot = thousands)
+        $hasDot   = strpos($value, '.') !== false;
+        $hasComma = strpos($value, ',') !== false;
+
+        if ($hasDot && $hasComma) {
+            // Whichever comes LAST is the decimal separator
+            if (strrpos($value, '.') > strrpos($value, ',')) {
+                // Anglo: 1,423.00 → remove commas, keep dot
+                $clean = str_replace(',', '', $value);
+            } else {
+                // ID: 1.423,00 → remove dots, replace comma with dot
+                $clean = str_replace('.', '', $value);
+                $clean = str_replace(',', '.', $clean);
+            }
+        } elseif ($hasComma && !$hasDot) {
+            // Could be: 1,423 (thousands) or 1,50 (decimal)
+            $parts = explode(',', $value);
+            // If there are multiple commas, or last part has more than 2 digits → thousands sep
+            if (count($parts) > 2 || strlen(end($parts)) != 2) {
+                $clean = str_replace(',', '', $value);
+            } else {
+                // Treat comma as decimal
+                $clean = str_replace(',', '.', $value);
+            }
+        } elseif ($hasDot && !$hasComma) {
+            // Could be: 1.423 (ID thousands) or 1.50 (decimal)
+            $parts = explode('.', $value);
+            // If there are multiple dots, or last part has more than 2 digits → thousands sep
+            if (count($parts) > 2 || strlen(end($parts)) != 2) {
+                $clean = str_replace('.', '', $value);
+            } else {
+                $clean = $value; // already valid decimal
+            }
+        } else {
+            $clean = $value;
+        }
 
         if (is_numeric($clean)) {
-            return $isInteger ? (int)round($clean) : $clean;
+            return $isInteger ? (int)round((float)$clean) : (float)$clean;
         }
 
         return 0;

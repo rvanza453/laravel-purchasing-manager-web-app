@@ -263,7 +263,7 @@ class InventoryController extends Controller
             $query->whereDate('date', '<=', $request->end_date);
         }
 
-        $movements = $query->latest('date')->latest('id')->paginate(20)->withQueryString();
+        $movements = $query->orderBy('date', 'asc')->orderBy('id', 'asc')->paginate(20)->withQueryString();
         $products = Product::orderBy('code')->get();
 
         return view('inventory.history', compact('warehouse', 'movements', 'products'));

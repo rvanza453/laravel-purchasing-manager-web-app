@@ -388,9 +388,8 @@
                 <th class="sub-header qty-col">Stock</th>
                 @foreach($hoApprovals as $ho)
                     @php
-                        // Dynamically fetch current config role to be safer against historical data
-                        $currentConfig = \App\Models\GlobalApproverConfig::where('user_id', $ho->approver_id)->first();
-                        $roleToDisplay = $currentConfig ? $currentConfig->role_name : $ho->role_name;
+                        // Display actual user position in table header instead of role_name
+                        $roleToDisplay = $ho->approver->position ?? ($ho->role_name ?? 'HO Approver');
                     @endphp
                     <th class="sub-header qty-col">{{ $roleToDisplay }}</th>
                 @endforeach
@@ -404,15 +403,14 @@
             @php
                 $finalQty = $item->getFinalQuantity();
                 
-                // Anggaran: Estimasi harga bila ada di product (dari product price_estimation)
-                $anggaranPrice = $item->product && $item->product->price_estimation ? $item->product->price_estimation : 0;
+                // Karena input harga manual sudah dimatikan, harga pengajuan sudah pasti 
+                // adalah harga master product saat PR dibuat.
+                // Kita gunakan harga historis yang tersimpan agar tidak berubah jika master product diupdate.
+                $basePrice = $item->price_estimation;
                 
-                // Pengajuan: Estimasi harga dari pembuat PR (price_estimation yang diinput)
-                $pengajuanPrice = $item->price_estimation;
+                $anggaranPrice = $basePrice;
+                $pengajuanPrice = $basePrice;
                 
-                // Total: (anggaran atau pengajuan) * kuantitas disetujui
-                // Gunakan anggaran jika ada, kalau tidak ada gunakan pengajuan
-                $basePrice = $anggaranPrice > 0 ? $anggaranPrice : $pengajuanPrice;
                 $totalPrice = $basePrice * $finalQty;
             @endphp
             <tr>

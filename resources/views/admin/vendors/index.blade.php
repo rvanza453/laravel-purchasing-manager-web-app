@@ -5,7 +5,7 @@
                 <h2 class="font-semibold text-xl text-gray-800 leading-tight">
                     {{ __('Management Supplier') }}
                 </h2>
-                @role('admin')
+                @role('Admin')
                 <a href="{{ route('vendors.create') }}" class="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
                     Add New Supplier
                 </a>
@@ -27,7 +27,7 @@
                                     <th class="px-6 py-3">PIC / Kontak</th>
                                     <th class="px-6 py-3">Kontak Admin</th>
                                     <th class="px-6 py-3">Status</th>
-                                    @role('admin')
+                                    @role('Admin')
                                     <th class="px-6 py-3 text-center">Actions</th>
                                     @endrole
                                 </tr>
@@ -61,7 +61,7 @@
                                                 {{ $vendor->status }}
                                             </span>
                                         </td>
-                                        @role('admin')
+                                        @role('Admin')
                                         <td class="px-6 py-4 text-center space-x-2">
                                             <a href="{{ route('vendors.edit', $vendor) }}" class="text-blue-600 hover:text-blue-900">Edit</a>
                                             <form action="{{ route('vendors.destroy', $vendor) }}" method="POST" class="inline" onsubmit="return confirm('Delete this supplier?')">

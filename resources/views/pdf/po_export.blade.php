@@ -311,21 +311,63 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach($po->items as $item)
+                @php
+                    $groupedItems = collect();
+
+                    foreach($po->items as $item) {
+                        $code = $item->prItem->product->code ?? '-';
+                        $name = $item->prItem->item_name;
+                        $unit = $item->unit;
+                        // use a precise string representation to avoid float issues in key
+                        $priceKey = number_format($item->unit_price, 2, '.', '');
+                        
+                        $key = $code . '|' . $name . '|' . $unit . '|' . $priceKey;
+
+                        if (!$groupedItems->has($key)) {
+                            $groupedItems->put($key, [
+                                'code' => $code,
+                                'name' => $name,
+                                'specification' => $item->prItem->specification ?? '-',
+                                'quantity' => 0,
+                                'unit' => $unit,
+                                'unit_price' => $item->unit_price,
+                                'subtotal' => 0,
+                            ]);
+                        }
+
+                        $group = $groupedItems->get($key);
+                        $group['quantity'] += $item->quantity;
+                        $group['subtotal'] += $item->subtotal;
+                        
+                        // Append specification if it's different and not just empty '-'
+                        $currentSpec = $item->prItem->specification ?? '-';
+                        if ($currentSpec !== '-' && $group['specification'] !== '-' && strpos($group['specification'], $currentSpec) === false) {
+                             $group['specification'] .= ', ' . $currentSpec;
+                        } elseif ($group['specification'] === '-' && $currentSpec !== '-') {
+                             $group['specification'] = $currentSpec;
+                        }
+
+                        $groupedItems->put($key, $group);
+                    }
+                    $rowCount = 0;
+                @endphp
+
+                @foreach($groupedItems as $group)
+                    @php $rowCount++; @endphp
                     <tr>
-                        <td class="text-center">{{ $loop->iteration }}</td>
-                        <td class="text-center">{{ $item->prItem->product->code ?? '-' }}</td>
-                        <td>{{ $item->prItem->item_name }}</td>
-                        <td>{{ $item->prItem->specification ?? '-'}}</td>
-                        <td class="text-center">{{ $item->quantity }}</td>
-                        <td class="text-center">{{ $item->unit }}</td>
-                        <td class="text-right">{{ number_format($item->unit_price, 0, ',', '.') }}</td>
-                        <td class="text-right">{{ number_format($item->subtotal, 0, ',', '.') }}</td>
+                        <td class="text-center">{{ $rowCount }}</td>
+                        <td class="text-center">{{ $group['code'] }}</td>
+                        <td>{{ $group['name'] }}</td>
+                        <td>{{ $group['specification'] }}</td>
+                        <td class="text-center">{{ $group['quantity'] }}</td>
+                        <td class="text-center">{{ $group['unit'] }}</td>
+                        <td class="text-right">{{ number_format($group['unit_price'], 0, ',', '.') }}</td>
+                        <td class="text-right">{{ number_format($group['subtotal'], 0, ',', '.') }}</td>
                     </tr>
                 @endforeach
                 
                 <!-- Empty rows for spacing -->
-                @for($i = $po->items->count(); $i < 2; $i++)
+                @for($i = $groupedItems->count(); $i < 2; $i++)
                     <tr>
                         <td>&nbsp;</td>
                         <td>&nbsp;</td>

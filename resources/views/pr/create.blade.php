@@ -183,6 +183,7 @@
          let currentProductList = []; 
          const categories = @json($categories);
          const departmentsData = @json($departments);
+         const allProductsData = @json($products);
          
          const BUDGET_TYPE_STATION = 'station';
          const BUDGET_TYPE_JOB_COA = 'job_coa';
@@ -226,15 +227,9 @@
                      
                      // 1. Fetch Products berdasarkan Site ID dari Department
                      if (selectedDept.site && selectedDept.site.id) {
-                        fetch(`/api/sites/${selectedDept.site.id}/products`)
-                            .then(res => res.json())
-                            .then(data => {
-                                currentProductList = data;
-                                // Jika ada row item yang sudah terbuka, update dropdown mereka?
-                                // Untuk simplifikasi, kita biarkan row lama (user harus hapus/add lagi jika ganti Unit drastis)
-                                // Atau bisa kita panggil refreshAllItemDropdowns() jika perlu.
-                            })
-                            .catch(err => console.error("Gagal mengambil katalog produk:", err));
+                         currentProductList = allProductsData.filter(p => {
+                             return p.sites && p.sites.some(s => s.id == selectedDept.site.id);
+                         });
                      }
 
                      // 2. Populate Station (Sub Department)
@@ -355,9 +350,18 @@
  
              // Build Options from Fetched Products
              let productOptions = '<option value="">-- Cari Barang --</option>';
-             // productOptions += '<option value="manual">+ Input Manual</option>';
+             const selectedDeptId = document.getElementById('department_id').value;
+             const selectedDeptObj = departmentsData.find(d => d.id == selectedDeptId);
+             const warehouseId = selectedDeptObj ? selectedDeptObj.warehouse_id : null;
+
              currentProductList.forEach(p => {
-                 productOptions += `<option value="${p.id}" data-name="${p.name}" data-unit="${p.unit}" data-price="${p.price_estimation || 0}">${p.code} - ${p.name}</option>`;
+                 let stockInfo = '';
+                 if (warehouseId && p.stocks) {
+                     const stockObj = p.stocks.find(s => s.warehouse_id == warehouseId);
+                     const stockQty = stockObj ? parseFloat(stockObj.quantity) : 0;
+                     stockInfo = ` [Stok: ${stockQty}]`;
+                 }
+                 productOptions += `<option value="${p.id}" data-name="${p.name}" data-unit="${p.unit}" data-price="${p.price_estimation || 0}">${p.code} - ${p.name}${stockInfo}</option>`;
              });
  
              const rowId = `row-${currentIndex}`;
@@ -596,6 +600,19 @@
          } catch (e) {
              console.error('Error in PR Create Init:', e);
          }
+
+         // Prevent form submission on Enter key press
+         document.addEventListener('keydown', function(event) {
+             if (event.key === 'Enter') {
+                 // Allow Enter key on textareas and buttons
+                 if (event.target.tagName.toLowerCase() !== 'textarea' && 
+                     event.target.tagName.toLowerCase() !== 'button' &&
+                     event.target.type !== 'submit') {
+                     event.preventDefault();
+                     return false;
+                 }
+             }
+         });
  
      </script>
  </x-app-layout>

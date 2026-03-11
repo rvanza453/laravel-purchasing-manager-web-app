@@ -20,6 +20,25 @@ class PrController extends Controller
 
     public function index(\Illuminate\Http\Request $request)
     {
+        // --- Persistent Filter Logic ---
+        $filterKeys = ['search', 'status', 'department_id', 'sub_department_id', 'start_date', 'end_date', 'current_approver_id', 'view_mode'];
+        
+        if ($request->has('reset')) {
+            // User clicked Reset
+            session()->forget('pr_filters');
+            return redirect()->route('pr.index');
+        } elseif ($request->has('filter_active')) {
+            // User submitted a filter form, save exactly what's submitted
+            $currentFilters = $request->only($filterKeys);
+            session(['pr_filters' => $currentFilters]);
+        } else {
+            // User just navigated here (e.g. from back button or link)
+            if (session()->has('pr_filters')) {
+                // Merge session filters into request so all subsequent logic uses them
+                $request->merge(session('pr_filters'));
+            }
+        }
+
         $user = auth()->user();
         $query = PurchaseRequest::with(['department', 'subDepartment', 'items']);
         // Eager load relationships including approver
@@ -88,8 +107,8 @@ class PrController extends Controller
                     } elseif ($status === 'Waiting PO') {
                         // Includes both purely Waiting PO and Partial PO (not fully complete)
                         $q->whereIn('status', ['Approved', 'PO Created'])
-                          ->whereDoesntHave('items', function ($iq) {
-                              $iq->havingRaw('COUNT(id) = (SELECT COUNT(pr_item_id) FROM po_items WHERE po_items.pr_item_id = pr_items.id)');
+                          ->whereHas('items', function ($iq) {
+                              $iq->whereDoesntHave('poItems');
                           });
                     } elseif ($status === 'Complete PO') {
                         $q->whereIn('status', ['Approved', 'PO Created'])
@@ -186,15 +205,15 @@ class PrController extends Controller
                     $q->whereIn('status', ['Pending', 'On Hold'])
                       ->whereHas('approvals', function($aq) use ($approverId) {
                           $aq->where('approver_id', $approverId)
-                             ->where('status', 'Pending');
+                             ->whereIn('status', ['Pending', 'On Hold']);
                       })
                       ->whereDoesntHave('approvals', function($aq) use ($approverId) {
-                          $aq->where('status', 'Pending')
+                          $aq->whereIn('status', ['Pending', 'On Hold'])
                              ->whereRaw('level < (
                                  SELECT level FROM pr_approvals 
                                  WHERE purchase_request_id = purchase_requests.id 
                                  AND approver_id = ? 
-                                 AND status = "Pending"
+                                 AND status IN ("Pending", "On Hold")
                                  LIMIT 1
                              )', [$approverId]);
                       });
@@ -214,8 +233,8 @@ class PrController extends Controller
                     ->join('pr_approvals as pa', 'pr.id', '=', 'pa.purchase_request_id')
                     ->join('users as u', 'pa.approver_id', '=', 'u.id')
                     ->whereIn('pr.status', ['Pending', 'On Hold'])
-                    ->where('pa.status', 'Pending')
-                    ->select('u.id', 'u.name', 'pa.level', 'pr.id as pr_id');
+                    ->whereIn('pa.status', ['Pending', 'On Hold'])
+                    ->select('u.id', 'u.name', 'pa.level', 'pr.id as pr_id', 'pa.role_name');
                 
                 if (!$isGlobal) {
                     if ($user->hasRole(['Purchasing', 'Approver'])) {
@@ -238,9 +257,10 @@ class PrController extends Controller
                     $currentApproval = $approvals->where('level', $lowestLevel)->first();
                     
                     if ($currentApproval && !isset($currentApprovers[$currentApproval->id])) {
+                        $roleName = $currentApproval->role_name ?? 'Approver';
                         $currentApprovers[$currentApproval->id] = [
                             'id' => $currentApproval->id,
-                            'name' => $currentApproval->name
+                            'name' => $roleName . ' (' . $currentApproval->name . ')'
                         ];
                     }
                 }
@@ -475,8 +495,8 @@ class PrController extends Controller
                     foreach ($prs as $pr) {
                         // Determine Approval Position
                         $approvalPos = '-';
-                        if ($pr->status === \App\Enums\PrStatus::PENDING->value) {
-                             $nextApproval = $pr->approvals->where('status', 'Pending')->sortBy('level')->first();
+                        if ($pr->status === \App\Enums\PrStatus::PENDING->value || $pr->status === \App\Enums\PrStatus::ON_HOLD->value) {
+                             $nextApproval = $pr->approvals->whereIn('status', ['Pending', 'On Hold'])->sortBy('level')->first();
                              if ($nextApproval) {
                                   // Can show Role or User if assigned
                                   $approvalPos = $nextApproval->role; 
@@ -545,12 +565,13 @@ class PrController extends Controller
             }]);
         }
 
+        // Eager load products with their sites and warehouse stocks for the frontend
+        $siteIds = $departments->pluck('site_id')->unique()->filter()->toArray();
         $products = collect(); 
-        
-        if ($departments->count() === 1) {
-            $siteId = $departments->first()->site_id;
-            $products = \App\Models\Product::whereHas('sites', function($q) use ($siteId) {
-                $q->where('sites.id', $siteId);
+
+        if (!empty($siteIds)) {
+            $products = \App\Models\Product::with(['sites', 'stocks'])->whereHas('sites', function($q) use ($siteIds) {
+                $q->whereIn('sites.id', $siteIds);
             })->whereNotNull('category')->orderBy('name')->get();
         }
 

@@ -504,15 +504,16 @@ class InventoryImportController extends Controller
             $updated = 0;
             $created = 0;
 
-            while (($data = fgetcsv($handle, 1000, ',')) !== FALSE) {
+            while (($data = fgetcsv($handle, 8192, ',')) !== FALSE) {
                 if (count($data) < 5) continue;
 
                 $warehouseName = trim($data[0] ?? '');
                 $itemCode = trim($data[1] ?? '');
                 $itemName = trim($data[2] ?? '');
                 $unit = trim($data[3] ?? '');
-                $qtyRaw = trim($data[4] ?? '0'); // 100.00
-                $qty = (float) $qtyRaw; 
+                $qtyRaw = trim($data[4] ?? '0');
+                // Remove thousands separator before casting: "362,131.00" → 362131.0
+                $qty = (float) str_replace(',', '', $qtyRaw);
                 $priceRaw = trim($data[5] ?? '0'); // "35,077,471" or "NaN" or "∞"
                 $price = 0;
                 $priceClean = str_replace([',', '"'], '', $priceRaw);

@@ -117,4 +117,41 @@ class ApprovalService
     {
         \Cache::forget('pr_current_approvers_*');
     }
+
+    public function revert(PrApproval $approval)
+    {
+        return DB::transaction(function () use ($approval) {
+            $pr = $approval->purchaseRequest;
+
+            // 1. Verify this is the latest approved/rejected/held step.
+            // Find the highest level approval that is NOT 'Pending'
+            $latestProcessedApproval = PrApproval::where('purchase_request_id', $pr->id)
+                ->where('status', '!=', 'Pending')
+                ->orderBy('level', 'desc')
+                ->first();
+
+            // If the approval being reverted is not the latest one, throw an error to enforce sequential rollback.
+            if (!$latestProcessedApproval || $latestProcessedApproval->id !== $approval->id) {
+                abort(400, 'Undo hanya bisa dilakukan secara berurutan pada aksi approval yang paling terakhir.');
+            }
+
+            // 2. Revert this specific approval
+            $approval->update([
+                'status' => 'Pending',
+                'approved_at' => null,
+                'remarks' => null,
+                'adjusted_quantities' => null,
+                'hold_reply' => null,
+                'replied_at' => null
+            ]);
+
+            // 3. Mark PR globally back to Pending so it returns to the queue
+            $pr->update(['status' => 'Pending']);
+
+            // 4. Clear Cache
+            $this->clearApproverCache();
+
+            return true;
+        });
+    }
 }

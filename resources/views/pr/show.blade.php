@@ -632,6 +632,10 @@
         <!-- Approval Timeline -->
         <div class="bg-white rounded-xl shadow-sm p-6">
             <h3 class="text-lg font-bold text-gray-800 mb-4">Riwayat Approval</h3>
+            @php
+                // Find the latest processed approval for the Undo button
+                $latestProcessedId = $pr->approvals->where('status', '!=', 'Pending')->sortByDesc('level')->first()?->id;
+            @endphp
             <div class="relative pl-6 border-l-2 border-gray-200 space-y-8">
                 @foreach($pr->approvals as $approval)
                     <div class="relative">
@@ -643,19 +647,37 @@
                                 <span class="text-sm font-bold text-gray-900">{{ $approval->role_name }} ({{ $approval->approver->name }})</span>
                                 <span class="block text-xs text-gray-400">Level {{ $approval->level }}</span>
                             </div>
-                            <div class="mt-1 sm:mt-0">
+                            <div class="mt-1 sm:mt-0 flex items-center gap-3">
                                 @if($approval->status === 'Approved')
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Approved</span>
-                                     <span class="block text-xs text-gray-400 text-right">{{ $approval->approved_at ? $approval->approved_at->format('d M H:i') : '' }}</span>
+                                    <div class="text-right">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Approved</span>
+                                        <span class="block text-xs text-gray-400 text-right">{{ $approval->approved_at ? $approval->approved_at->format('d M H:i') : '' }}</span>
+                                    </div>
                                 @elseif($approval->status === 'Rejected')
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Rejected</span>
-                                     <span class="block text-xs text-gray-400 text-right">{{ $approval->approved_at ? $approval->approved_at->format('d M H:i') : '' }}</span>
+                                    <div class="text-right">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Rejected</span>
+                                        <span class="block text-xs text-gray-400 text-right">{{ $approval->approved_at ? $approval->approved_at->format('d M H:i') : '' }}</span>
+                                    </div>
                                 @elseif($approval->status === 'On Hold')
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">On Hold</span>
-                                     <span class="block text-xs text-gray-400 text-right">{{ $approval->approved_at ? $approval->approved_at->format('d M H:i') : '' }}</span>
+                                    <div class="text-right">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">On Hold</span>
+                                        <span class="block text-xs text-gray-400 text-right">{{ $approval->approved_at ? $approval->approved_at->format('d M H:i') : '' }}</span>
+                                    </div>
                                 @else
                                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Pending</span>
                                 @endif
+
+                                @role('Admin')
+                                    @if($approval->id === $latestProcessedId)
+                                        <form method="POST" action="{{ route('approval.revert', $approval->id) }}" class="inline ml-2" onsubmit="return confirm('Apakah Anda yakin ingin membatalkan (Undo) proses approval ini? Status PR akan kembali ke posisi sebelumnya.')">
+                                            @csrf
+                                            <button type="submit" class="px-2.5 py-1 text-xs font-bold text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors flex items-center gap-1 shadow-sm">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                                                Batal (Undo)
+                                            </button>
+                                        </form>
+                                    @endif
+                                @endrole
                             </div>
                         </div>
                         @if($approval->remarks)

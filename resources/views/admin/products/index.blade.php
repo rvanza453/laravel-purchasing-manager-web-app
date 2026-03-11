@@ -44,9 +44,9 @@
 
                     <div class="w-full md:w-3/4">
                         <label for="search" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Pencarian</label>
-                        <div class="relative flex items-center">
-                            <input type="text" name="search" id="search" value="{{ request('search') }}" placeholder="Cari Kode atau Nama Produk..." class="block w-full pl-4 pr-12 py-2.5 border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                            <button type="submit" class="absolute right-1 top-1 bottom-1 bg-gray-800 text-white px-4 rounded-md text-sm font-medium hover:bg-gray-700 transition">
+                        <div style="position: relative; display: flex; align-items: center;">
+                            <input type="text" name="search" id="search" value="{{ request('search') }}" placeholder="Cari Kode atau Nama Produk..." class="block w-full pl-4 py-2.5 border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" style="padding-right: 4.5rem;">
+                            <button type="submit" class="bg-gray-800 text-white rounded-md text-sm font-medium hover:bg-gray-700 transition" style="position: absolute; right: 4px; top: 4px; bottom: 4px; padding-left: 1rem; padding-right: 1rem;">
                                 Cari
                             </button>
                         </div>

@@ -5,20 +5,23 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use App\Models\PrApproval;
 use App\Services\FonnteService;
+use App\Services\NtfyService;
 use App\Enums\PrStatus;
 use Illuminate\Support\Facades\Log;
 
 class SendDailyPendingPrNotifications extends Command
 {
     protected $signature = 'pr:notify-pending';
-    protected $description = 'Send daily WhatsApp summary of pending PR approvals (lower level first, staggered delay)';
+    protected $description = 'Send daily ntfy.sh push notification summary of pending PR approvals';
 
     protected $fonnteService;
+    protected $ntfyService;
 
     public function __construct(FonnteService $fonnteService)
     {
         parent::__construct();
-        $this->fonnteService = $fonnteService;
+        $this->fonnteService = $fonnteService; // Kept for future re-use
+        $this->ntfyService   = new NtfyService();
     }
 
     public function handle()
@@ -93,19 +96,22 @@ class SendDailyPendingPrNotifications extends Command
             $message = $this->buildMessage($user->name, $total, $prList);
 
             try {
-                // Wait 10 seconds between sends to avoid WA spam
-                if (!$isFirst) {
-                    $this->info("Waiting 10 seconds before next send...");
-                    sleep(20);
-                }
 
-                $this->fonnteService->sendMessage($user->phone_number, $message);
-                $this->info("Sent notification to {$user->name} (Level {$data['level']}, {$total} PRs)");
+
+                // Send via ntfy.sh — per-user topic so only this user receives it
+                $title = "📋 Pending PR Approval — {$user->name}";
+                $tags  = 'bell,memo';
+                $this->ntfyService->sendToUser($user->id, $message, $title, $tags);
+
+                // To switch back to WhatsApp, comment line above and uncomment below:
+                // $this->fonnteService->sendMessage($user->phone_number, $message);
+
+                $this->info("Sent ntfy notification for {$user->name} (Level {$data['level']}, {$total} PRs)");
                 $count++;
                 $isFirst = false;
             } catch (\Exception $e) {
                 $this->error("Failed to send to {$user->name}: " . $e->getMessage());
-                Log::error('Fonnte Daily Job Error: ' . $e->getMessage());
+                Log::error('ntfy Daily Job Error: ' . $e->getMessage());
                 $isFirst = false;
             }
         }

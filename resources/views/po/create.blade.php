@@ -30,7 +30,7 @@
             </a>
         </div>
 
-        <form method="POST" action="{{ route('po.store') }}" id="po-form">
+        <form method="POST" action="{{ route('po.store') }}" id="po-form" class="space-y-8">
             @csrf
             <input type="hidden" name="pr_number_string" value="{{ $prNumberString }}">
             <input type="hidden" name="pr_date_string" value="{{ $prDateString }}">
@@ -40,6 +40,7 @@
                 <div class="px-6 py-4 border-b border-gray-100 bg-gray-50">
                     <h3 class="text-sm font-bold text-gray-700 uppercase">Item yang Dipilih</h3>
                 </div>
+                <!-- ... table ... -->
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
@@ -143,9 +144,9 @@
                     
                     <div class="space-y-4">
                         <!-- Vendor Selection -->
-                        <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
-                            <div class="w-2/3">
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Pilih Vendor (Master Data)</label>
+                        <div class="flex flex-col md:flex-row justify-between md:items-center gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <div class="w-full md:flex-1">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Pilih Vendor (Master Data)</label>
                                 <select id="vendor-select" name="vendor_id" class="w-full border-gray-300 rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500" onchange="handleVendorChange()">
                                     <option value="">-- Pilih Vendor --</option>
                                     @foreach($vendors as $vendor)
@@ -473,12 +474,24 @@
                 if (!vendorData.address) emptyFields.push('Alamat Vendor');
                 if (!vendorData.phone) emptyFields.push('Telepon Vendor');
                 
-                if (emptyFields.length > 0) {
-                    console.error('⚠️ WARNING: Vendor data tidak lengkap!', emptyFields);
-                    alert('⚠️ PERINGATAN: Data vendor "' + selectedOption.text + '" tidak lengkap!\n\n' +
-                          'Field yang kosong: ' + emptyFields.join(', ') + '\n\n' +
-                          'Silakan aktifkan "Edit Info Manual" untuk melengkapi data, atau pilih vendor lain.');
+                
+                // Set custom validation messages for HTML5 form submission
+                function validateField(id, value, fieldName, rules = {}) {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    
+                    el.setCustomValidity(''); // Reset first
+                    
+                    if (rules.required && (!value || value.trim() === '' || value.trim() === '-')) {
+                        el.setCustomValidity(`⚠️ ${fieldName} wajib diisi dan tidak boleh hanya strip (-).`);
+                    } else if (rules.noHyphen && value.includes('-')) {
+                        el.setCustomValidity(`⚠️ ${fieldName} tidak boleh mengandung karakter strip (-). Format harus angka tersambung.`);
+                    }
                 }
+
+                validateField('vendor_name', vendorData.name, 'Nama Vendor', { required: true });
+                validateField('vendor_address', vendorData.address, 'Alamat Vendor', { required: true });
+                validateField('vendor_phone', vendorData.phone, 'Telepon Vendor', { required: true, noHyphen: true });
                 
                 // Set all fields to readonly
                 fields.forEach(id => {
@@ -556,6 +569,16 @@
         document.addEventListener('DOMContentLoaded', function() {
             calculateTotals();
             restoreVendorState();
+            
+            // Initialize TomSelect for Vendor dropdown to make it searchable
+            new TomSelect('#vendor-select', {
+                create: false,
+                sortField: { field: "text", direction: "asc" },
+                placeholder: "-- Cari & Pilih Vendor --",
+                onChange: function(value) {
+                    handleVendorChange();
+                }
+            });
         });
 
         function restoreVendorState() {
@@ -585,6 +608,20 @@
                 document.getElementById('new-vendor-alert').classList.add('hidden');
                 document.getElementById('manual-edit-toggle').disabled = false;
             }
+
+            // Clear custom validity on input so user can submit after fixing
+            document.querySelectorAll('#vendor_name, #vendor_address, #vendor_phone').forEach(el => {
+                if (el) {
+                    el.addEventListener('input', function() {
+                        this.setCustomValidity(''); 
+                        if (this.id === 'vendor_phone' && this.value.includes('-')) {
+                            this.setCustomValidity('⚠️ Telepon Vendor tidak boleh mengandung karakter strip (-). Format harus angka tersambung.');
+                        } else if (this.value.trim() === '' || this.value.trim() === '-') {
+                            this.setCustomValidity(`⚠️ Kolom ini wajib diisi dan tidak boleh hanya strip (-).`);
+                        }
+                    });
+                }
+            });
         }
     </script>
 </x-app-layout>

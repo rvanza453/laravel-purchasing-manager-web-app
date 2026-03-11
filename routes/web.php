@@ -58,6 +58,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/users/{user}/impersonate', [\App\Http\Controllers\Admin\UserController::class, 'impersonate'])->name('users.impersonate');
         Route::resource('sites', \App\Http\Controllers\Admin\SiteController::class);
         
+        // --- SYSTEM RESET DATA ---
+        Route::get('/system/reset-warehouse', [\App\Http\Controllers\Admin\SystemResetController::class, 'showResetWarehouse'])->name('system.reset-warehouse');
+        Route::post('/system/reset-warehouse', [\App\Http\Controllers\Admin\SystemResetController::class, 'resetWarehouse'])->name('system.reset-warehouse.post');
+        
         // Full Approve PR
         Route::post('/pr/{pr}/full-approve', [\App\Http\Controllers\PrController::class, 'fullApprove'])->name('pr.full-approve');
         
@@ -103,7 +107,7 @@ Route::middleware('auth')->group(function () {
         // Inventory Management
         Route::get('/inventory/create', [\App\Http\Controllers\InventoryController::class, 'create'])->name('inventory.create');
         Route::post('/inventory', [\App\Http\Controllers\InventoryController::class, 'store'])->name('inventory.store');
-        // Route::get('/inventory-import/kde-script', [\App\Http\Controllers\InventoryImportController::class, 'importKdeInventory'])->name('inventory.import.kde');
+        Route::get('/inventory-import/kde-script', [\App\Http\Controllers\InventoryImportController::class, 'importKdeInventory'])->name('inventory.import.kde');
         Route::get('/inventory-import/out', [\App\Http\Controllers\InventoryImportController::class, 'formOut'])->name('inventory.import.out');
         Route::post('/inventory-import/out', [\App\Http\Controllers\InventoryImportController::class, 'store'])->name('inventory.import.out.process');
         Route::get('/inventory/{warehouse}/edit', [\App\Http\Controllers\InventoryController::class, 'edit'])->name('inventory.edit');
@@ -149,6 +153,11 @@ Route::middleware('auth')->group(function () {
         Route::post('/approvals/{approval}/approve', [ApprovalController::class, 'approve'])->name('approval.approve');
         Route::post('/approvals/{approval}/reject', [ApprovalController::class, 'reject'])->name('approval.reject');
         Route::post('/approvals/{approval}/hold', [ApprovalController::class, 'hold'])->name('approval.hold');
+        
+        // Admin only - Revert Approval
+        Route::middleware(['role:Admin'])->group(function () {
+            Route::post('/approvals/{approval}/revert', [ApprovalController::class, 'revert'])->name('approval.revert');
+        });
     });
 
     // --- CAPEX ROUTES ---

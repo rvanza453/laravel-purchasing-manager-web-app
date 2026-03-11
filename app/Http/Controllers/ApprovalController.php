@@ -197,4 +197,24 @@ class ApprovalController extends Controller
         return redirect()->route('approval.index')->with('success', 'PR Rejected.');
     }
 
+    public function revert(Request $request, PrApproval $approval)
+    {
+        \Illuminate\Support\Facades\Log::info('Revert Attempt', [
+            'user_id' => auth()->id(),
+            'approval_id' => $approval->id,
+            'role' => auth()->user()->getRoleNames()
+        ]);
+
+        // Only Admin can revert approvals
+        if (!auth()->user()->hasRole('Admin')) {
+            abort(403, 'Anda tidak memiliki hak akses untuk fitur Batal Approve. (Khusus Admin)');
+        }
+
+        try {
+            $this->approvalService->revert($approval);
+            return back()->with('success', 'Aksi Approval berhasil dibatalkan (Undo). PR kembali ke antrian Pending.');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Gagal Undo: ' . $e->getMessage());
+        }
+    }
 }
