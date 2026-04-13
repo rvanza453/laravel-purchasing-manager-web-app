@@ -1,0 +1,54 @@
+<x-admin-layout>
+    <div class="max-w-2xl">
+        <div class="mb-6">
+            <h2 class="text-2xl font-bold text-gray-800">Tambah Master Sub Department</h2>
+        </div>
+
+        @if(session('success'))
+            <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6">
+                {{ session('success') }}
+            </div>
+        @endif
+
+        @if($errors->any())
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+                <ul class="list-disc list-inside">
+                    @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        <form method="POST" action="{{ route('admin.sub-departments.store') }}" class="bg-white rounded-lg shadow p-6 space-y-6">
+            @csrf
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                <select name="department_id" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" required>
+                    <option value="">Pilih Department</option>
+                    @foreach($departments as $department)
+                        <option value="{{ $department->id }}" @selected(old('department_id') == $department->id)>
+                            {{ $department->name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nama Sub Department</label>
+                <input type="text" name="name" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" value="{{ old('name') }}" required>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">COA</label>
+                <input type="text" name="coa" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" value="{{ old('coa') }}">
+            </div>
+
+            <div class="flex gap-3 justify-end pt-6 border-t border-gray-200">
+                <a href="{{ route('admin.sub-departments.index') }}" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Batal</a>
+                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500">Buat Sub Department</button>
+            </div>
+        </form>
+    </div>
+</x-admin-layout>

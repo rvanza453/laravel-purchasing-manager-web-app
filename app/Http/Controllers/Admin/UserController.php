@@ -2,166 +2,202 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Http\Controllers\Controller;
+use App\Models\User;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
+use Illuminate\View\View;
+use Modules\ServiceAgreementSystem\Models\Department;
+use Modules\ServiceAgreementSystem\Models\Site;
+use Spatie\Permission\Models\Role;
 
-class UserController extends Controller
+class UserController extends AdminController
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function index(): View
     {
-        $users = \App\Models\User::with(['roles', 'site', 'department'])
-                    ->orderBy('name')
-                    ->get()
-                    ->groupBy(function($user) {
-                        return $user->site->name ?? 'No Site';
-                    });
-        return view('admin.users.index', compact('users'));
+        $users = User::query()
+            ->with(['roles:id,name', 'moduleRoles:id,user_id,module_key,role_name'])
+            ->orderBy('name')
+            ->paginate(20);
+
+        return view('admin.users.index', [
+            'users' => $users,
+            'moduleRoleConfig' => config('module-roles.modules', []),
+        ]);
     }
 
-    public function create()
+    public function create(): View
     {
-        $roles = \Spatie\Permission\Models\Role::all();
-        $sites = \App\Models\Site::all();
-        $departments = \App\Models\Department::all();
-        return view('admin.users.create', compact('roles', 'sites', 'departments'));
+        $sites = Site::query()->orderBy('name')->get(['id', 'name']);
+        $departments = Department::query()->orderBy('name')->get(['id', 'name', 'site_id']);
+
+        return view('admin.users.create', [
+            'user' => new User(),
+            'sites' => $sites,
+            'departments' => $departments,
+            'spatieRoles' => Role::query()->orderBy('name')->pluck('name'),
+            'moduleRoleConfig' => config('module-roles.modules', []),
+            'selectedGlobalRole' => null,
+            'selectedModuleRoles' => [],
+            'isEdit' => false,
+        ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|min:8|confirmed',
-            'role' => 'required|exists:roles,name',
-            'site_id' => 'nullable|exists:sites,id',
-            'department_id' => 'nullable|exists:departments,id',
-            'position' => 'nullable|string',
-            'phone_number' => 'nullable|string|max:20',
+        $validated = $this->validatePayload($request);
+
+        $user = User::query()->create([
+            'name' => $validated['name'],
+            'username' => $validated['username'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+            'site_id' => $validated['site_id'] ?? null,
+            'department_id' => $validated['department_id'] ?? null,
+            'position' => $validated['position'] ?? null,
+            'phone_number' => $validated['phone_number'] ?? null,
         ]);
 
-        $user = \App\Models\User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => \Illuminate\Support\Facades\Hash::make($request->password),
-            'site_id' => $request->site_id,
-            'department_id' => $request->department_id,
-            'position' => $request->position,
-            'phone_number' => $request->phone_number,
-        ]);
+        $this->syncRoles($user, $validated);
 
-        $user->assignRole($request->role);
-
-        \App\Helpers\ActivityLogger::log('created', 'Created user: ' . $user->name, $user);
-
-        return redirect()->route('users.index')->with('success', 'User created successfully.');
+        return redirect()->route('admin.users.index')
+            ->with('success', 'Akun berhasil ditambahkan.');
     }
 
-    public function edit(\App\Models\User $user)
+    public function edit(User $user): View
     {
-        $roles = \Spatie\Permission\Models\Role::all();
-        $sites = \App\Models\Site::all();
-        
-        // Filter departments based on user's site
-        if ($user->site_id) {
-            $departments = \App\Models\Department::where('site_id', $user->site_id)->orderBy('name')->get();
-        } else {
-            $departments = \Illuminate\Database\Eloquent\Collection::make(); // Empty if no site
-        }
-        
-        return view('admin.users.edit', compact('user', 'roles', 'sites', 'departments'));
+        $user->load(['roles:id,name', 'moduleRoles:id,user_id,module_key,role_name']);
+        $sites = Site::query()->orderBy('name')->get(['id', 'name']);
+        $departments = Department::query()->orderBy('name')->get(['id', 'name', 'site_id']);
+
+        return view('admin.users.edit', [
+            'user' => $user,
+            'sites' => $sites,
+            'departments' => $departments,
+            'spatieRoles' => Role::query()->orderBy('name')->pluck('name'),
+            'moduleRoleConfig' => config('module-roles.modules', []),
+            'selectedGlobalRole' => optional($user->roles->first())->name,
+            'selectedModuleRoles' => $user->moduleRoles->pluck('role_name', 'module_key')->toArray(),
+            'isEdit' => true,
+        ]);
     }
 
-    public function update(Request $request, \App\Models\User $user)
+    public function update(Request $request, User $user): RedirectResponse
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,' . $user->id,
-            'password' => 'nullable|min:8|confirmed',
-            'role' => 'required|exists:roles,name',
-            'site_id' => 'nullable|exists:sites,id',
-            'department_id' => 'nullable|exists:departments,id',
-            'position' => 'nullable|string',
-            'phone_number' => 'nullable|string|max:20',
-        ]);
+        $validated = $this->validatePayload($request, $user->id);
 
-        $data = [
-            'name' => $request->name,
-            'email' => $request->email,
-            'site_id' => $request->site_id,
-            'department_id' => $request->department_id,
-            'position' => $request->position,
-            'phone_number' => $request->phone_number,
+        $payload = [
+            'name' => $validated['name'],
+            'username' => $validated['username'],
+            'email' => $validated['email'],
+            'site_id' => $validated['site_id'] ?? null,
+            'department_id' => $validated['department_id'] ?? null,
+            'position' => $validated['position'] ?? null,
+            'phone_number' => $validated['phone_number'] ?? null,
         ];
 
-        if ($request->filled('password')) {
-            $data['password'] = \Illuminate\Support\Facades\Hash::make($request->password);
+        if (!empty($validated['password'])) {
+            $payload['password'] = Hash::make($validated['password']);
         }
 
-        $user->update($data);
-        $user->syncRoles([$request->role]);
+        $user->update($payload);
+        $this->syncRoles($user, $validated);
 
-        \App\Helpers\ActivityLogger::log('updated', 'Updated user: ' . $user->name, $user);
-
-        return redirect()->route('users.index')->with('success', 'User updated successfully.');
+        return redirect()->route('admin.users.index')
+            ->with('success', 'Akun berhasil diperbarui.');
     }
 
-    public function destroy(\App\Models\User $user)
+    public function destroy(User $user): RedirectResponse
     {
-        if ($user->id === auth()->id()) {
-            return back()->with('error', 'Cannot delete yourself.');
-        }
-        $name = $user->name;
         $user->delete();
-        
-        \App\Helpers\ActivityLogger::log('deleted', 'Deleted user: ' . $name);
 
-        return back()->with('success', 'User deleted successfully.');
+        return redirect()->route('admin.users.index')
+            ->with('success', 'Akun berhasil dihapus.');
     }
-    
-    public function impersonate(\App\Models\User $user, \Illuminate\Http\Request $request)
+
+    public function impersonate(User $user, Request $request): RedirectResponse
     {
-        if (!auth()->user()->hasRole('Admin')) {
+        if (!auth()->user()?->hasRole('Admin')) {
             abort(403, 'Only admin can impersonate users.');
         }
 
         if ($user->id === auth()->id()) {
-            return back()->with('error', 'You cannot impersonate yourself.');
+            return back()->with('error', 'Anda tidak dapat impersonate akun sendiri.');
         }
 
-        // Verify password
-        $password = $request->input('admin_password');
-        if ($password !== config('app.admin_verification_password')) {
-            return back()->with('error', 'Password verifikasi salah!');
+        $password = (string) $request->input('admin_password', '');
+        $verificationPassword = (string) config('prsystem.app.admin_verification_password', config('app.admin_verification_password'));
+
+        if ($password !== $verificationPassword) {
+            return back()->with('error', 'Password verifikasi salah.');
         }
 
         session(['impersonate_admin_id' => auth()->id()]);
-        
-        \Illuminate\Support\Facades\Auth::login($user);
+        Auth::login($user);
 
-        \App\Helpers\ActivityLogger::log('impersonated', 'Admin impersonated user: ' . $user->name, $user);
-
-        return redirect()->route('dashboard')->with('success', 'Now logged in as ' . $user->name);
+        return redirect()->route('modules.index')->with('success', 'Berhasil login sebagai ' . $user->name . '.');
     }
 
-    public function leaveImpersonate()
+    public function leaveImpersonate(): RedirectResponse
     {
         if (!session()->has('impersonate_admin_id')) {
-            return redirect()->route('dashboard')->with('error', 'You are not impersonating anyone.');
+            return redirect()->route('modules.index')->with('error', 'Tidak ada sesi impersonate aktif.');
         }
 
-        $adminId = session('impersonate_admin_id');
-        $currentUser = auth()->user();
-        
+        $adminId = (int) session('impersonate_admin_id');
         session()->forget('impersonate_admin_id');
-        
-        $admin = \App\Models\User::findOrFail($adminId);
-        \Illuminate\Support\Facades\Auth::login($admin);
 
-        \App\Helpers\ActivityLogger::log('left-impersonation', 'Admin left impersonation of user: ' . $currentUser->name);
+        $admin = User::query()->find($adminId);
+        if (!$admin) {
+            return redirect()->route('modules.index')->with('error', 'Akun admin asal tidak ditemukan.');
+        }
 
-        return redirect()->route('users.index')->with('success', 'Returned to admin account.');
+        Auth::login($admin);
+
+        return redirect()->route('admin.users.index')->with('success', 'Kembali ke akun admin.');
+    }
+
+    private function validatePayload(Request $request, ?int $ignoreUserId = null): array
+    {
+        $moduleRoleConfig = config('module-roles.modules', []);
+        $moduleKeys = array_keys($moduleRoleConfig);
+
+        $rules = [
+            'name' => ['required', 'string', 'max:255'],
+            'username' => [
+                'required',
+                'string',
+                'max:255',
+                'alpha_dash',
+                Rule::unique('users', 'username')->ignore($ignoreUserId),
+            ],
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($ignoreUserId)],
+            'password' => [$ignoreUserId ? 'nullable' : 'required', 'string', 'min:6'],
+            'site_id' => ['nullable', 'exists:sites,id'],
+            'department_id' => ['nullable', 'exists:departments,id'],
+            'position' => ['nullable', 'string', 'max:255'],
+            'phone_number' => ['nullable', 'string', 'max:20'],
+            'global_role' => ['nullable', 'string', 'exists:roles,name'],
+            'module_roles' => ['nullable', 'array'],
+        ];
+
+        foreach ($moduleKeys as $moduleKey) {
+            $roles = Arr::get($moduleRoleConfig, $moduleKey . '.roles', []);
+            $rules['module_roles.' . $moduleKey] = ['nullable', 'string', 'in:' . implode(',', $roles)];
+        }
+
+        return $request->validate($rules);
+    }
+
+    private function syncRoles(User $user, array $validated): void
+    {
+        $globalRole = $validated['global_role'] ?? null;
+        $moduleRoles = array_filter($validated['module_roles'] ?? []);
+
+        $user->syncRoles($globalRole ? [$globalRole] : []);
+        $user->syncModuleRoles($moduleRoles);
     }
 }

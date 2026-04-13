@@ -1,0 +1,11 @@
+{
+    "name": "SystemSupport",
+    "alias": "systemsupport",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\SystemSupport\\Providers\\SystemSupportServiceProvider"
+    ],
+    "files": []
+}

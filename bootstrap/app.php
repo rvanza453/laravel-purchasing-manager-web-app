@@ -1,55 +1,64 @@
 <?php
 
-/*
-|--------------------------------------------------------------------------
-| Create The Application
-|--------------------------------------------------------------------------
-|
-| The first thing we will do is create a new Laravel application instance
-| which serves as the "glue" for all the components of Laravel, and is
-| the IoC container for the system binding all of the various parts.
-|
-*/
+use Illuminate\Foundation\Application;
+use Illuminate\Foundation\Configuration\Exceptions;
+use Illuminate\Foundation\Configuration\Middleware;
 
-$app = new Illuminate\Foundation\Application(
-    $_ENV['APP_BASE_PATH'] ?? dirname(__DIR__)
-);
+spl_autoload_register(static function (string $class): void {
+    $prefix = 'Modules\\';
 
-/*
-|--------------------------------------------------------------------------
-| Bind Important Interfaces
-|--------------------------------------------------------------------------
-|
-| Next, we need to bind some important interfaces into the container so
-| we will be able to resolve them when needed. The kernels serve the
-| incoming requests to this application from both the web and CLI.
-|
-*/
+    if (! str_starts_with($class, $prefix)) {
+        return;
+    }
 
-$app->singleton(
-    Illuminate\Contracts\Http\Kernel::class,
-    App\Http\Kernel::class
-);
+    $relativeClass = str_replace('\\', DIRECTORY_SEPARATOR, substr($class, strlen($prefix)));
+    $basePath = dirname(__DIR__).DIRECTORY_SEPARATOR.'Modules'.DIRECTORY_SEPARATOR;
+    $segments = explode(DIRECTORY_SEPARATOR, $relativeClass);
+    $moduleName = $segments[0] ?? null;
+    $moduleRelative = count($segments) > 1
+        ? implode(DIRECTORY_SEPARATOR, array_slice($segments, 1))
+        : null;
 
-$app->singleton(
-    Illuminate\Contracts\Console\Kernel::class,
-    App\Console\Kernel::class
-);
+    $candidates = [
+        $basePath.$relativeClass.'.php',
+    ];
 
-$app->singleton(
-    Illuminate\Contracts\Debug\ExceptionHandler::class,
-    App\Exceptions\Handler::class
-);
+    // Fallback for nwidart module structure: Modules/{Module}/app/*
+    if ($moduleName && $moduleRelative) {
+        $candidates[] = $basePath.$moduleName.DIRECTORY_SEPARATOR.'app'.DIRECTORY_SEPARATOR.$moduleRelative.'.php';
+    }
 
-/*
-|--------------------------------------------------------------------------
-| Return The Application
-|--------------------------------------------------------------------------
-|
-| This script returns the application instance. The instance is given to
-| the calling script so we can separate the building of the instances
-| from the actual running of the application and sending responses.
-|
-*/
+    foreach ($candidates as $path) {
+        if (is_string($path) && file_exists($path)) {
+            require_once $path;
 
-return $app;
+            return;
+        }
+    }
+});
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withRouting(
+        web: __DIR__.'/../routes/web.php',
+        commands: __DIR__.'/../routes/console.php',
+        health: '/up',
+    )
+    ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->web(append: [
+            \App\Http\Middleware\LogModuleActivity::class,
+        ]);
+
+        $middleware->alias([
+            'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
+            'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
+            'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
+            'assigned.role' => \App\Http\Middleware\EnsureUserHasAssignedRole::class,
+            'pr.role'   => \Modules\PrSystem\Http\Middleware\PrRoleMiddleware::class,
+            'qc.role'   => \Modules\QcComplaintSystem\Http\Middleware\QcRoleMiddleware::class,
+            'ispo.role' => \Modules\SystemISPO\Http\Middleware\IspoRoleMiddleware::class,
+            'sas.role'  => \Modules\ServiceAgreementSystem\Http\Middleware\SasRoleMiddleware::class,
+        ]);
+    })
+    ->withExceptions(function (Exceptions $exceptions): void {
+        //
+    })->create();

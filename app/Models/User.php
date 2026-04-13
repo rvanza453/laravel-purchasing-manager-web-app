@@ -2,67 +2,128 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Database\Factories\UserFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Permission\Traits\HasRoles;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable, HasRoles, SoftDeletes;
+    /** @use HasFactory<UserFactory> */
+    use HasFactory, Notifiable, HasRoles, SoftDeletes;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'name',
+        'username',
         'email',
+        'phone_number',
         'password',
-        'site_id',
-        'department_id',
+        'is_active',
         'position',
         'signature_path',
-        'phone_number',
+        'site_id',
+        'department_id',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
-    protected $casts = [
-        'email_verified_at' => 'datetime',
-        'password' => 'hashed',
-    ];
-
-    public function site(): BelongsTo
+    protected function casts(): array
     {
-        return $this->belongsTo(Site::class);
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+            'is_active' => 'boolean',
+        ];
     }
 
-    public function department(): BelongsTo
+    public function site()
     {
-        return $this->belongsTo(Department::class);
+        return $this->belongsTo(\Modules\ServiceAgreementSystem\Models\Site::class);
     }
-    
-    public function pendingApprovals()
+
+    public function department()
     {
-        return $this->hasMany(\App\Models\PrApproval::class, 'approver_id');
+        return $this->belongsTo(\Modules\ServiceAgreementSystem\Models\Department::class);
+    }
+
+    public function moduleRoles(): HasMany
+    {
+        return $this->hasMany(ModuleRoleAssignment::class);
+    }
+
+    public function moduleRole(string $moduleKey): ?string
+    {
+        return $this->moduleRoles
+            ->firstWhere('module_key', $moduleKey)
+            ?->role_name;
+    }
+
+    public function hasModuleRole(string $moduleKey, string|array $roles): bool
+    {
+        $roleName = $this->moduleRole($moduleKey);
+
+        if (!$roleName) {
+            return false;
+        }
+
+        $roleSet = is_array($roles) ? $roles : [$roles];
+
+        return in_array($roleName, $roleSet, true);
+    }
+
+    public function syncModuleRoles(array $moduleRoles): void
+    {
+        $moduleRoles = array_filter($moduleRoles, fn ($role) => filled($role));
+
+        if (empty($moduleRoles)) {
+            $this->moduleRoles()->delete();
+
+            return;
+        }
+
+        $this->moduleRoles()
+            ->whereNotIn('module_key', array_keys($moduleRoles))
+            ->delete();
+
+        foreach ($moduleRoles as $moduleKey => $roleName) {
+            $this->moduleRoles()->updateOrCreate(
+                ['module_key' => $moduleKey],
+                ['role_name' => $roleName]
+            );
+        }
+    }
+
+    public function prGlobalApproverScopeSiteIds(): array
+    {
+        if (!class_exists(\Modules\PrSystem\Models\GlobalApproverConfig::class)) {
+            return [];
+        }
+
+        return \Modules\PrSystem\Models\GlobalApproverConfig::query()
+            ->where('user_id', $this->id)
+            ->whereNotNull('site_id')
+            ->pluck('site_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public function hasPrGlobalApproverAllSitesScope(): bool
+    {
+        if (!class_exists(\Modules\PrSystem\Models\GlobalApproverConfig::class)) {
+            return false;
+        }
+
+        return \Modules\PrSystem\Models\GlobalApproverConfig::query()
+            ->where('user_id', $this->id)
+            ->whereNull('site_id')
+            ->exists();
     }
 }

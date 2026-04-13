@@ -2,41 +2,39 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Http\Controllers\Controller;
-use App\Models\Department;
-use App\Models\Site;
-use App\Models\SubDepartment;
+use Modules\PrSystem\Models\Department;
+use Modules\PrSystem\Models\Site;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\Rule;
 
-class MasterDepartmentController extends Controller
+class MasterDepartmentController extends AdminController
 {
-    public function index(Request $request)
+    public function index(Request $request): View
     {
         $site_id = $request->site_id;
         
         if ($site_id) {
             $site = Site::findOrFail($site_id);
-            $departments = Department::where('site_id', $site_id)->with(['subDepartments'])->orderBy('name')->get();
-            return view('admin.master_departments.index', compact('departments', 'site'));
+            $departments = Department::where('site_id', $site_id)->with(['subDepartments'])->orderBy('name')->paginate(20);
+            return view('admin.master-departments.index', compact('departments', 'site'));
         }
 
-        $sites = Site::withCount('departments')->orderBy('name')->get();
-        return view('admin.master_departments.index', compact('sites'));
+        $sites = Site::withCount('departments')->orderBy('name')->paginate(20);
+        return view('admin.master-departments.index', compact('sites'));
     }
 
-    public function create()
+    public function create(): View
     {
         $sites = Site::all();
-        $warehouses = \App\Models\Warehouse::all();
-        return view('admin.master_departments.create', compact('sites', 'warehouses'));
+        return view('admin.master-departments.create', compact('sites'));
     }
 
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'site_id' => 'required|exists:sites,id',
-            'warehouse_id' => 'nullable|exists:warehouses,id',
             'name' => 'required|string|max:255',
             'coa' => ['required', 'string', 'max:50', Rule::unique('departments')->where(function ($query) use ($request) {
                 return $query->where('site_id', $request->site_id);
@@ -45,25 +43,23 @@ class MasterDepartmentController extends Controller
 
         Department::create($validated);
 
-        return back()->with('success', 'Department created successfully.');
+        return redirect()->route('admin.master-departments.index')->with('success', 'Unit berhasil ditambahkan.');
     }
 
-    public function edit(Department $master_department)
+    public function edit(Department $master_department): View
     {
         $department = $master_department; 
         $sites = Site::all();
-        $warehouses = \App\Models\Warehouse::all();
         $department->load('subDepartments'); 
 
-        return view('admin.master_departments.edit', compact('department', 'sites', 'warehouses'));
+        return view('admin.master-departments.edit', compact('department', 'sites'));
     }
 
-    public function update(Request $request, Department $master_department)
+    public function update(Request $request, Department $master_department): RedirectResponse
     {
         $department = $master_department;
         $validated = $request->validate([
-            'site_id' => 'required|exists:sites,id', // Added site_id update capability
-            'warehouse_id' => 'nullable|exists:warehouses,id',
+            'site_id' => 'required|exists:sites,id',
             'name' => 'required|string|max:255',
             'coa' => ['required', 'string', 'max:50', Rule::unique('departments')->ignore($department->id)->where(function ($query) use ($department) {
                 return $query->where('site_id', $department->site_id);
@@ -72,12 +68,12 @@ class MasterDepartmentController extends Controller
 
         $department->update($validated);
 
-        return back()->with('success', 'Department updated successfully.');
+        return redirect()->route('admin.master-departments.index')->with('success', 'Unit berhasil diperbarui.');
     }
 
-    public function destroy(Department $master_department)
+    public function destroy(Department $master_department): RedirectResponse
     {
         $master_department->delete();
-        return redirect()->route('master-departments.index')->with('success', 'Department deleted successfully.');
+        return redirect()->route('admin.master-departments.index')->with('success', 'Unit berhasil dihapus.');
     }
 }

@@ -2,84 +2,69 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Http\Controllers\Controller;
-use App\Models\SubDepartment;
-use App\Models\Department;
+use Modules\PrSystem\Models\SubDepartment;
+use Modules\PrSystem\Models\Department;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Validation\Rule;
 
-class SubDepartmentController extends Controller
+class SubDepartmentController extends AdminController
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function index(): View
     {
-        $subDepartments = SubDepartment::with('department')->orderBy('name')->get();
-        return view('admin.sub_departments.index', compact('subDepartments'));
+        $subDepartments = SubDepartment::with(['department.site'])
+                        ->orderBy('name')
+                        ->paginate(20);
+        
+        return view('admin.sub-departments.index', compact('subDepartments'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    public function create(): View
     {
         $departments = Department::orderBy('name')->get();
-        return view('admin.sub_departments.create', compact('departments'));
+        return view('admin.sub-departments.create', compact('departments'));
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
-        $request->validate([
+        $validated = $request->validate([
             'department_id' => 'required|exists:departments,id',
             'name' => 'required|string|max:255',
-            'coa' => 'nullable|string|max:50',
+            'coa' => ['nullable', 'string', 'max:50', Rule::unique('sub_departments', 'coa')->where(function ($query) use ($request) {
+                return $query->where('department_id', $request->department_id);
+            })],
         ]);
 
-        SubDepartment::create($request->all());
+        SubDepartment::create($validated);
 
-        if ($request->has('redirect_back')) {
-            return back()->with('success', 'Sub Department created successfully.');
-        }
-
-        return back()
-            ->with('success', 'Sub Department created successfully.');
+        return redirect()->route('admin.sub-departments.index')->with('success', 'Sub Department berhasil ditambahkan.');
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(SubDepartment $subDepartment)
+    public function edit(SubDepartment $sub_department): View
     {
         $departments = Department::orderBy('name')->get();
-        return view('admin.sub_departments.edit', compact('subDepartment', 'departments'));
+        return view('admin.sub-departments.edit', compact('sub_department', 'departments'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, SubDepartment $subDepartment)
+    public function update(Request $request, SubDepartment $sub_department): RedirectResponse
     {
-        $request->validate([
+        $validated = $request->validate([
             'department_id' => 'required|exists:departments,id',
             'name' => 'required|string|max:255',
-            'coa' => 'nullable|string|max:50',
+            'coa' => ['nullable', 'string', 'max:50', Rule::unique('sub_departments', 'coa')->ignore($sub_department->id)->where(function ($query) use ($request) {
+                return $query->where('department_id', $request->department_id);
+            })],
         ]);
 
-        $subDepartment->update($request->all());
+        $sub_department->update($validated);
 
-        return back()
-            ->with('success', 'Sub Department updated successfully.');
+        return redirect()->route('admin.sub-departments.index')->with('success', 'Sub Department berhasil diperbarui.');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(SubDepartment $subDepartment)
+    public function destroy(SubDepartment $sub_department): RedirectResponse
     {
-        $subDepartment->delete();
-        return back()->with('success', 'Sub Department deleted successfully.');
+        $sub_department->delete();
+        return redirect()->route('admin.sub-departments.index')->with('success', 'Sub Department berhasil dihapus.');
     }
 }

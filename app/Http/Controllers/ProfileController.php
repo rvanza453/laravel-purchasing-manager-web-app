@@ -2,98 +2,101 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\ProfileUpdateRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class ProfileController extends Controller
 {
-    /**
-     * Display the user's profile form.
-     */
-    public function edit(Request $request): View
+    public function show(): View
     {
+        $user = auth()->user();
+        $user->load(['roles:id,name', 'moduleRoles:id,user_id,module_key,role_name']);
+
+        return view('profile.show', [
+            'user' => $user,
+            'totalModulesAccess' => $user->moduleRoles->count(),
+        ]);
+    }
+
+    public function edit(): View
+    {
+        $user = auth()->user();
+        $user->load(['roles:id,name', 'moduleRoles:id,user_id,module_key,role_name']);
+
         return view('profile.edit', [
-            'user' => $request->user(),
-            'sites' => \App\Models\Site::all(),
-            'departments' => \App\Models\Department::all(),
+            'user' => $user,
+            'totalModulesAccess' => $user->moduleRoles->count(),
         ]);
     }
 
-    /**
-     * Update the user's employment information.
-     */
-    public function updateEmployment(Request $request): RedirectResponse
+    public function update(Request $request): RedirectResponse
     {
+        $user = auth()->user();
+
         $validated = $request->validate([
-            'site_id' => ['nullable', 'exists:sites,id'],
-            'department_id' => ['nullable', 'exists:departments,id'],
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email,' . $user->id],
+            'phone_number' => ['nullable', 'string', 'max:20'],
             'position' => ['nullable', 'string', 'max:255'],
+            'current_password' => ['nullable', 'string'],
+            'password' => ['nullable', 'string', 'min:6', 'confirmed'],
         ]);
 
-        $request->user()->update($validated);
+        // If new password provided, validate current password
+        if (!empty($validated['password'])) {
+            if (empty($validated['current_password'])) {
+                return back()->withErrors(['current_password' => 'Password saat ini diperlukan untuk mengubah password.']);
+            }
 
-        return Redirect::route('profile.edit')->with('status', 'employment-updated');
-    }
+            if (!Hash::check($validated['current_password'], $user->password)) {
+                return back()->withErrors(['current_password' => 'Password saat ini tidak sesuai.']);
+            }
 
-    /**
-     * Update the user's profile information.
-     */
-    public function update(ProfileUpdateRequest $request): RedirectResponse
-    {
-        $request->user()->fill($request->validated());
-
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+            $validated['password'] = Hash::make($validated['password']);
+        } else {
+            unset($validated['password']);
         }
 
-        $request->user()->save();
+        unset($validated['current_password']);
 
-        return Redirect::route('profile.edit')->with('status', 'profile-updated');
+        $user->update($validated);
+
+        return redirect()->route('global.profile.show')
+            ->with('success', 'Profil berhasil diperbarui.');
     }
 
-
-    /**
-     * Upload user signature image.
-     */
     public function uploadSignature(Request $request): RedirectResponse
     {
         $request->validate([
-            'signature' => ['required', 'image', 'mimes:png,jpg,jpeg', 'max:2048'], // Max 2MB
+            'signature' => ['required', 'image', 'mimes:png,jpg,jpeg', 'max:2048'],
         ]);
 
-        $user = $request->user();
+        $user = auth()->user();
 
-        // Delete old signature if exists
         if ($user->signature_path) {
             Storage::disk('public')->delete($user->signature_path);
         }
 
-        // Store new signature
         $path = $request->file('signature')->store('signatures', 'public');
-
-        // Update user
         $user->update(['signature_path' => $path]);
 
-        return Redirect::route('profile.edit')->with('status', 'signature-uploaded');
+        return redirect()->route('global.profile.edit')
+            ->with('success', 'Tanda tangan berhasil diupload.');
     }
 
-    /**
-     * Delete user signature image.
-     */
-    public function deleteSignature(Request $request): RedirectResponse
+    public function deleteSignature(): RedirectResponse
     {
-        $user = $request->user();
+        $user = auth()->user();
 
         if ($user->signature_path) {
             Storage::disk('public')->delete($user->signature_path);
             $user->update(['signature_path' => null]);
         }
 
-        return Redirect::route('profile.edit')->with('status', 'signature-deleted');
+        return redirect()->route('global.profile.edit')
+            ->with('success', 'Tanda tangan berhasil dihapus.');
     }
 }

@@ -1,238 +1,69 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\GlobalManagementController;
+use App\Http\Controllers\ModuleHubController;
+use App\Models\User;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Admin\CategoryController;
-use App\Http\Controllers\PrController;
-use App\Http\Controllers\ApprovalController;
-use App\Http\Controllers\InventoryImportController;
 
 Route::get('/', function () {
-    return redirect()->route('login');
+    return auth()->check()
+        ? redirect()->route('modules.index')
+        : redirect()->route('login');
 });
 
-Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])
-    ->middleware(['auth', 'verified'])
-    ->name('dashboard');
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
+    Route::post('/login', [LoginController::class, 'login'])->name('login.submit');
 
-Route::middleware('auth')->group(function () {
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::patch('/profile/employment', [ProfileController::class, 'updateEmployment'])->name('profile.update-employment');
-    
-    // Signature routes
-    Route::post('/profile/signature', [ProfileController::class, 'uploadSignature'])->name('profile.signature.upload');
-    Route::delete('/profile/signature', [ProfileController::class, 'deleteSignature'])->name('profile.signature.delete');
+    // Backward-compatible SAS login aliases used by legacy views.
+    Route::get('/sas/login', [LoginController::class, 'showLoginForm'])->name('sas.login');
+    Route::post('/sas/login', [LoginController::class, 'login'])->name('sas.login.submit');
+});
 
-    Route::get('/pr/export', [PrController::class, 'export'])->name('pr.export');
-    Route::resource('pr', PrController::class);
-    Route::post('/pr/{pr}/reply-hold', [PrController::class, 'replyToHold'])->name('pr.replyHold');
-    Route::get('/pr/{purchaseRequest}/export-pdf', [\App\Http\Controllers\PrPdfController::class, 'export'])->name('pr.export.pdf');
-    Route::get('/pr/{purchaseRequest}/attachment/download', [PrController::class, 'downloadAttachment'])->name('pr.attachment.download');
-    Route::get('/api/budget/{subDepartment}', [PrController::class, 'getBudgetStatus'])->name('api.budget.status');
-    Route::get('/api/sub-department/{subDepartment}/jobs', [PrController::class, 'getJobs'])->name('api.jobs');
-    Route::get('/api/department/{department}/jobs', [PrController::class, 'getJobsByDepartment'])->name('api.department.jobs');
-    Route::get('/api/sites/{site}/departments', [\App\Http\Controllers\Admin\DepartmentController::class, 'getDepartmentsBySite'])->name('api.sites.departments');
+Route::middleware(['auth', 'assigned.role'])->group(function () {
+    Route::get('/modules', [ModuleHubController::class, 'index'])->name('modules.index');
 
-    // --- PO READ ROUTES (All Authenticated Users) ---
-    Route::get('/po', [\App\Http\Controllers\PoController::class, 'index'])->name('po.index');
-    Route::get('/po/{po}', [\App\Http\Controllers\PoController::class, 'show'])
-        ->where('po', '[0-9]+')
-        ->name('po.show');
-    Route::get('/po/{po}/export-pdf', [\App\Http\Controllers\PoPdfController::class, 'export'])->name('po.export.pdf');
-    
-    // FETCH PRODUCT BY SITES
-    Route::get('/api/sites/{site}/products', [\App\Http\Controllers\PrController::class, 'getProductsBySite'])->name('api.site.products');
-    
-    //leave login as
-    Route::post('/users/leave-impersonate', [\App\Http\Controllers\Admin\UserController::class, 'leaveImpersonate'])->name('users.leave-impersonate');
-
-    // --- ADMIN ROUTES (Full Access) ---
     Route::middleware(['role:Admin'])->group(function () {
-        Route::resource('departments', \App\Http\Controllers\Admin\DepartmentController::class);
-        Route::resource('master-departments', \App\Http\Controllers\Admin\MasterDepartmentController::class);
-        Route::resource('sub-departments', \App\Http\Controllers\Admin\SubDepartmentController::class);
-        Route::resource('users', \App\Http\Controllers\Admin\UserController::class);
-        Route::resource('global-approvers', \App\Http\Controllers\Admin\GlobalApproverController::class);
-        
-        Route::post('/users/{user}/impersonate', [\App\Http\Controllers\Admin\UserController::class, 'impersonate'])->name('users.impersonate');
-        Route::resource('sites', \App\Http\Controllers\Admin\SiteController::class);
-        
-        // --- SYSTEM RESET DATA ---
-        Route::get('/system/reset-warehouse', [\App\Http\Controllers\Admin\SystemResetController::class, 'showResetWarehouse'])->name('system.reset-warehouse');
-        Route::post('/system/reset-warehouse', [\App\Http\Controllers\Admin\SystemResetController::class, 'resetWarehouse'])->name('system.reset-warehouse.post');
-        
-        // Full Approve PR
-        Route::post('/pr/{pr}/full-approve', [\App\Http\Controllers\PrController::class, 'fullApprove'])->name('pr.full-approve');
-        
-        // Product & Vendor Write Access (Admin Only)
-        Route::get('products/export', [\App\Http\Controllers\Admin\ProductController::class, 'export'])->name('products.export');
-        Route::resource('products', \App\Http\Controllers\Admin\ProductController::class)->except(['index', 'show']);
-        Route::resource('vendors', \App\Http\Controllers\Admin\VendorController::class)->except(['index', 'show']);
-        
-        Route::resource('jobs', \App\Http\Controllers\Admin\JobController::class);
-        Route::post('jobs/{job}/mappings', [\App\Http\Controllers\Admin\JobController::class, 'updateMappings'])->name('jobs.mappings.update');
-        Route::get('/admin/budgets', [\App\Http\Controllers\Admin\BudgetController::class, 'index'])->name('admin.budgets.index');
-        Route::get('/admin/budgets/{subDepartment}/edit', [\App\Http\Controllers\Admin\BudgetController::class, 'edit'])->name('admin.budgets.edit');
-        Route::put('/admin/budgets/{subDepartment}', [\App\Http\Controllers\Admin\BudgetController::class, 'update'])->name('admin.budgets.update');
-        Route::get('/admin/budgets/department/{department}/edit', [\App\Http\Controllers\Admin\BudgetController::class, 'editDepartment'])->name('admin.budgets.edit-department');
-        Route::put('/admin/budgets/department/{department}', [\App\Http\Controllers\Admin\BudgetController::class, 'updateDepartment'])->name('admin.budgets.update-department');
-        
-        // Activity Logs
-        Route::get('/admin/activity-logs', [\App\Http\Controllers\Admin\ActivityLogController::class, 'index'])->name('activity-logs.index');
-    });
+        Route::get('/management', [GlobalManagementController::class, 'index'])->name('management.dashboard');
 
-    // --- BUDGET MONITORING (Admin & Approver) ---
-    Route::middleware(['role:Admin|Approver'])->group(function () {
-        Route::get('/admin/budgets/monitoring', [\App\Http\Controllers\Admin\BudgetController::class, 'monitoring'])->name('admin.budgets.monitoring');
-        Route::get('/admin/budgets/{budget}/details', [\App\Http\Controllers\Admin\BudgetController::class, 'usageDetails'])->name('admin.budgets.details');
-    });
-
-    // --- PURCHASING ROUTES (PO & Inventory) ---
-    // Accessible by: Purchasing, Admin, Warehouse
-    Route::middleware(['role:Purchasing|Admin|Warehouse'])->group(function () {
-        // PO Management
-        Route::get('/pr/{purchaseRequest}/po/select-items', [\App\Http\Controllers\PoController::class, 'selectItems'])->name('po.select-items');
-        // PO Creation Flow
-        Route::match(['get', 'post'], '/po/create', [\App\Http\Controllers\PoController::class, 'create'])->name('po.create');
-        Route::post('/po', [\App\Http\Controllers\PoController::class, 'store'])->name('po.store');
-
-        // PO Cart
-        Route::get('/po/cart', [\App\Http\Controllers\PoCartController::class, 'index'])->name('po.cart');
-        Route::get('/po/cart/data', [\App\Http\Controllers\PoCartController::class, 'getData'])->name('po.cart.data');
-        Route::post('/po/cart/add', [\App\Http\Controllers\PoCartController::class, 'store'])->name('po.cart.add');
-        Route::post('/po/cart/remove', [\App\Http\Controllers\PoCartController::class, 'remove'])->name('po.cart.remove');
-        Route::post('/po/cart/clear', [\App\Http\Controllers\PoCartController::class, 'clear'])->name('po.cart.clear');
-
-        // Inventory Management
-        Route::get('/inventory/create', [\App\Http\Controllers\InventoryController::class, 'create'])->name('inventory.create');
-        Route::post('/inventory', [\App\Http\Controllers\InventoryController::class, 'store'])->name('inventory.store');
-        Route::get('/inventory-import/kde-script', [\App\Http\Controllers\InventoryImportController::class, 'importKdeInventory'])->name('inventory.import.kde');
-        Route::get('/inventory-import/out', [\App\Http\Controllers\InventoryImportController::class, 'formOut'])->name('inventory.import.out');
-        Route::post('/inventory-import/out', [\App\Http\Controllers\InventoryImportController::class, 'store'])->name('inventory.import.out.process');
-        Route::get('/inventory/{warehouse}/edit', [\App\Http\Controllers\InventoryController::class, 'edit'])->name('inventory.edit');
-        Route::put('/inventory/{warehouse}', [\App\Http\Controllers\InventoryController::class, 'update'])->name('inventory.update');
-        Route::delete('/inventory/{warehouse}', [\App\Http\Controllers\InventoryController::class, 'destroy'])->name('inventory.destroy');
-        Route::get('/inventory/{warehouse}/movement/{type}', [\App\Http\Controllers\InventoryController::class, 'createMovement'])->name('inventory.movement');
-        Route::post('/inventory/{warehouse}/movement', [\App\Http\Controllers\InventoryController::class, 'storeMovement'])->name('inventory.store-movement');
-    });
-
-    // --- PO EDIT/DELETE ROUTES ---
-    // Accessible by: Admin, Warehouse (Exclude Purchasing)
-    Route::middleware(['role:Admin|Warehouse'])->group(function () {
-        Route::get('/po/{po}/edit', [\App\Http\Controllers\PoController::class, 'edit'])->name('po.edit');
-        Route::put('/po/{po}', [\App\Http\Controllers\PoController::class, 'update'])->name('po.update');
-        Route::delete('/po/{po}', [\App\Http\Controllers\PoController::class, 'destroy'])->name('po.destroy');
-    });
-
-    // --- FINANCE ROUTES ---
-    // Accessible by: Finance, Purchasing, Admin
-    Route::middleware(['role:Finance|Purchasing|Admin|Warehouse'])->group(function () {
-    });
-
-    // --- GENERIC READ-ONLY VIEWS (Inventory, Products, Vendors) ---
-    // Accessible by: Purchasing, Admin, Warehouse
-    Route::middleware(['role:Purchasing|Admin|Warehouse'])->group(function () {
-        Route::get('/inventory', [\App\Http\Controllers\InventoryController::class, 'index'])->name('inventory.index');
-        Route::get('/inventory/{warehouse}/history', [\App\Http\Controllers\InventoryController::class, 'history'])->name('inventory.history');
-        Route::get('/inventory/{warehouse}', [\App\Http\Controllers\InventoryController::class, 'show'])->name('inventory.show');
-
-        // Products Read-Only
-        Route::get('/products', [\App\Http\Controllers\Admin\ProductController::class, 'index'])->name('products.index');
-        Route::get('/products/{product}', [\App\Http\Controllers\Admin\ProductController::class, 'show'])->name('products.show');
-
-        // Vendors Read-Only
-        Route::get('/vendors', [\App\Http\Controllers\Admin\VendorController::class, 'index'])->name('vendors.index');
-        Route::get('/vendors/{vendor}', [\App\Http\Controllers\Admin\VendorController::class, 'show'])->name('vendors.show');
-    });
-
-    // --- APPROVER ROUTES ---
-    // Accessible by: Authenticated Users (Controller enforces ownership)
-    Route::middleware(['auth'])->group(function () {
-        Route::get('/approvals', [ApprovalController::class, 'index'])->name('approval.index');
-        Route::post('/approvals/{approval}/approve', [ApprovalController::class, 'approve'])->name('approval.approve');
-        Route::post('/approvals/{approval}/reject', [ApprovalController::class, 'reject'])->name('approval.reject');
-        Route::post('/approvals/{approval}/hold', [ApprovalController::class, 'hold'])->name('approval.hold');
-        
-        // Admin only - Revert Approval
-        Route::middleware(['role:Admin'])->group(function () {
-            Route::post('/approvals/{approval}/revert', [ApprovalController::class, 'revert'])->name('approval.revert');
+        // New Master Admin Area (Separate from Modules)
+        Route::prefix('/admin')->name('admin.')->group(function () {
+            Route::resource('users', \App\Http\Controllers\Admin\UserController::class);
+            Route::post('users/{user}/impersonate', [\App\Http\Controllers\Admin\UserController::class, 'impersonate'])->name('users.impersonate');
+            Route::post('users/leave-impersonate', [\App\Http\Controllers\Admin\UserController::class, 'leaveImpersonate'])->name('users.leave-impersonate');
+            Route::resource('sites', \App\Http\Controllers\Admin\SiteController::class);
+            Route::resource('master-departments', \App\Http\Controllers\Admin\MasterDepartmentController::class);
+            Route::resource('departments', \App\Http\Controllers\Admin\DepartmentController::class);
+            Route::resource('sub-departments', \App\Http\Controllers\Admin\SubDepartmentController::class);
+                Route::resource('blocks', \App\Http\Controllers\Admin\BlockController::class);
+            Route::resource('activity-logs', \App\Http\Controllers\Admin\ActivityLogController::class, ['only' => ['index']]);
+            
+            // API route for fetching departments by site for User form
+            Route::get('/api/sites/{site}/departments', function (\Modules\ServiceAgreementSystem\Models\Site $site) {
+                return response()->json($site->departments()->select('id', 'name')->orderBy('name')->get());
+            })->name('api.sites.departments');
+            
+            // Maintenance Routes
+            Route::get('maintenance', [\App\Http\Controllers\Admin\SystemMaintenanceController::class, 'index'])->name('maintenance.index');
+            Route::post('maintenance/{module}', [\App\Http\Controllers\Admin\SystemMaintenanceController::class, 'toggle'])->name('maintenance.toggle');
         });
+
+        // Backward-compatible aliases to keep old account URLs working,
+        // while user management is now centralized at admin.users.* routes.
+        Route::get('/accounts', fn () => redirect()->route('admin.users.index'))->name('accounts.index');
+        Route::get('/accounts/create', fn () => redirect()->route('admin.users.create'))->name('accounts.create');
+        Route::get('/accounts/{account}/edit', fn (User $account) => redirect()->route('admin.users.edit', $account))->name('accounts.edit');
     });
 
-    // --- CAPEX ROUTES ---
-    Route::resource('capex', \App\Http\Controllers\CapexController::class);
-    Route::post('/capex/{capex}/approve', [\App\Http\Controllers\CapexController::class, 'approve'])->name('capex.approve');
-    Route::post('/capex/{capex}/reject', [\App\Http\Controllers\CapexController::class, 'reject'])->name('capex.reject');
-    Route::post('/capex/{capex}/hold', [\App\Http\Controllers\CapexController::class, 'hold'])->name('capex.hold');
-    Route::post('/capex/{capex}/mark-signed', [\App\Http\Controllers\CapexController::class, 'markSigned'])->name('capex.mark-signed');
-    
-    // PDF & Auto-PR Routes
-    Route::get('/capex/{capex}/print', [\App\Http\Controllers\CapexController::class, 'print'])->name('capex.print');
-    Route::post('/capex/{capex}/upload', [\App\Http\Controllers\CapexController::class, 'upload'])->name('capex.upload');
-    Route::post('/capex/{capex}/verify', [\App\Http\Controllers\CapexController::class, 'verify'])->name('capex.verify');
+    Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+    // Global profile routes (outside module-specific profile pages)
+    Route::get('/global-profile', [\App\Http\Controllers\ProfileController::class, 'show'])->name('global.profile.show');
+    Route::get('/global-profile/edit', [\App\Http\Controllers\ProfileController::class, 'edit'])->name('global.profile.edit');
+    Route::put('/global-profile', [\App\Http\Controllers\ProfileController::class, 'update'])->name('global.profile.update');
+    Route::post('/global-profile/signature', [\App\Http\Controllers\ProfileController::class, 'uploadSignature'])->name('global.profile.signature.upload');
+    Route::delete('/global-profile/signature', [\App\Http\Controllers\ProfileController::class, 'deleteSignature'])->name('global.profile.signature.delete');
 
-    Route::middleware(['role:Admin'])->prefix('admin')->name('admin.')->group(function () {
-        Route::resource('capex/assets', \App\Http\Controllers\CapexAssetController::class)->names('capex.assets');
-        Route::resource('capex/budgets', \App\Http\Controllers\CapexBudgetController::class)->names('capex.budgets');
-        Route::post('capex/budgets/{budget}/pta', [\App\Http\Controllers\CapexBudgetController::class, 'addPta'])->name('capex.budgets.pta');
-        Route::get('capex/config', [\App\Http\Controllers\CapexConfigController::class, 'index'])->name('capex.config.index');
-        Route::get('capex/config/{department}/edit', [\App\Http\Controllers\CapexConfigController::class, 'edit'])->name('capex.config.edit');
-        Route::put('capex/config/{department}', [\App\Http\Controllers\CapexConfigController::class, 'update'])->name('capex.config.update');
-    });
+    // Backward-compatible SAS logout alias used by legacy layouts.
+    Route::post('/sas/logout', [LoginController::class, 'logout'])->name('sas.logout');
 });
-
-require __DIR__.'/auth.php';
-
-// Utility route for hosting without SSH
-Route::get('/clear-cache', function() {
-    try {
-        \Illuminate\Support\Facades\Artisan::call('optimize:clear');
-        return "Cache cleared successfully!<br>" . nl2br(\Illuminate\Support\Facades\Artisan::output());
-    } catch (\Exception $e) {
-        return "Error clearing cache: " . $e->getMessage();
-    }
-});
-
-Route::get('/maintenance-on', function() {
-    try {
-        // Laravel 8+ handles maintenance via a file in storage/framework
-        // We set a secret so you can still access the site to turn it off later
-        \Illuminate\Support\Facades\Artisan::call('down', [
-            '--secret' => 'admin-maintenance'
-        ]);
-        return "<h2>Sistem dalam mode Maintenance (OFFLINE)</h2>" .
-               "Pesan: " . \Illuminate\Support\Facades\Artisan::output() . "<br>" .
-               "Untuk tetap bisa mengakses sistem selama maintenance, gunakan link ini: <br>" .
-               "<a href='/admin-maintenance'>" . url('/admin-maintenance') . "</a><br><br>" .
-               "<b>Simpan link di atas!</b> Anda butuh link itu untuk mengakses jalan 'belakang' guna mematikan mode maintenance nanti.";
-    } catch (\Exception $e) {
-        return "Error: " . $e->getMessage();
-    }
-});
-
-Route::get('/maintenance-off', function() {
-    try {
-        \Illuminate\Support\Facades\Artisan::call('up');
-        return "<h2>Sistem kembali ONLINE</h2>" . \Illuminate\Support\Facades\Artisan::output();
-    } catch (\Exception $e) {
-        return "Error: " . $e->getMessage();
-    }
-});
-
-Route::get('/send-notification', function() {
-    if (!auth()->check() || !auth()->user()->hasRole('Admin')) {
-        abort(403, 'Unauthorized');
-    }
-    
-    try {
-        \Illuminate\Support\Facades\Artisan::call('pr:notify-pending');
-        $output = \Illuminate\Support\Facades\Artisan::output();
-        return "<h2>✅ Notification Test Completed</h2><pre>" . $output . "</pre><br><a href='/dashboard'>← Back to Dashboard</a>";
-    } catch (\Exception $e) {
-        return "Error: " . $e->getMessage();
-    }
-});
-
-
-

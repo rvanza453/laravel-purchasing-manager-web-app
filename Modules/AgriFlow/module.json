@@ -1,0 +1,11 @@
+{
+    "name": "AgriFlow",
+    "alias": "agriflow",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\AgriFlow\\Providers\\AgriFlowServiceProvider"
+    ],
+    "files": []
+}

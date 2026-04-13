@@ -1,0 +1,9 @@
+{
+    "ServiceAgreementSystem": true,
+    "QcComplaintSystem": true,
+    "SystemISPO": true,
+    "management": true,
+    "PrSystem": true,
+    "SystemSupport": true,
+    "AgriFlow": true
+}

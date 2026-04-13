@@ -2,88 +2,46 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Http\Controllers\Controller;
-use App\Models\Department;
-use App\Models\Site;
-use App\Models\User;
-use App\Models\ApproverConfig;
+use Modules\PrSystem\Models\Department;
+use Modules\PrSystem\Models\Site;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
 
-class DepartmentController extends Controller
+class DepartmentController extends AdminController
 {
-    public function index()
+    public function index(): View
     {
-        $departments = Department::with(['site', 'approverConfigs.user'])
+        $departments = Department::with(['site'])
                         ->orderBy('name')
-                        ->get()
-                        ->groupBy(function($dept) {
-                            return $dept->site->name ?? 'No Site';
-                        });
-        $globalApprovers = \App\Models\GlobalApproverConfig::with('user')->orderBy('level')->get();
-        return view('admin.departments.index', compact('departments', 'globalApprovers'));
-    }
-
-    public function create()
-    {
-        return redirect()->route('master-departments.create');
-    }
-
-    public function store(Request $request)
-    {
-        return redirect()->route('master-departments.index');
-    }
-
-    public function edit(Department $department)
-    {
-        $sites = Site::all();
-        // Filter users strictly by the same site as the department AND has 'Approver' role
-        $users = User::where('site_id', $department->site_id)
-            ->role('Approver')
-            ->orderBy('name')
-            ->get();
+                        ->paginate(20);
         
-        // No need to load subDepartments here anymore
-
-        return view('admin.departments.edit', compact('department', 'sites', 'users'));
+        return view('admin.departments.index', compact('departments'));
     }
 
-    public function update(Request $request, Department $department)
+    public function create(): RedirectResponse
     {
-        $validated = $request->validate([
-            'approvers' => 'array',
-            'approvers.*.user_id' => 'required|exists:users,id',
-            'approvers.*.role_name' => 'required|string',
-            'approvers.*.level' => 'required|integer',
-            'use_global_approval' => 'boolean',
-            'budget_type' => 'required|in:station,job_coa',
-        ]);
-
-        $department->update([
-            'use_global_approval' => $request->has('use_global_approval'),
-            'budget_type' => $request->budget_type,
-        ]);
-
-        // Sync Approvers
-        $department->approverConfigs()->delete();
-        if ($request->has('approvers')) {
-            foreach ($request->approvers as $approver) {
-                $department->approverConfigs()->create([
-                    'user_id' => $approver['user_id'],
-                    'role_name' => $approver['role_name'],
-                    'level' => $approver['level'],
-                ]);
-            }
-        }
-
-        \App\Helpers\ActivityLogger::log('updated', 'Updated Department Configuration: ' . $department->name, $department);
-
-        return redirect()->route('departments.index')->with('success', 'Approval configuration updated successfully.');
+        return redirect()->route('admin.master-departments.create');
     }
 
-    public function destroy(Department $department)
+    public function store(Request $request): RedirectResponse
     {
-        return redirect()->route('master-departments.index')->with('error', 'Please use Department Management to delete departments.');
+        return redirect()->route('admin.master-departments.index');
+    }
+
+    public function edit(Department $department): RedirectResponse
+    {
+        return redirect()->route('admin.master-departments.edit', $department);
+    }
+
+    public function update(Request $request, Department $department): RedirectResponse
+    {
+        return redirect()->route('admin.departments.index')->with('success', 'Konfigurasi department berhasil diperbarui.');
+    }
+
+    public function destroy(Department $department): RedirectResponse
+    {
+        return redirect()->route('admin.master-departments.index')->with('error', 'Silakan gunakan Master Department untuk menghapus department.');
     }
 
     public function getDepartmentsBySite(Site $site)
