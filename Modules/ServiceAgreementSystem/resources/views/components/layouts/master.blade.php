@@ -153,6 +153,13 @@
             font-size: 14px;
         }
 
+        /* Guard: keep Budget USPK menu visible even if overridden by external CSS */
+        .sidebar-link.menu-uspk-budget {
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
+
         .sidebar-user {
             padding: 20px;
             border-top: 1px solid var(--border-color);
@@ -372,6 +379,18 @@
             background-repeat: no-repeat;
             background-size: 18px;
             padding-right: 40px;
+        }
+
+        /* Keep native multi-select rendering to avoid invisible option text on some browsers */
+        select.form-control[multiple] {
+            appearance: auto;
+            background-image: none;
+            padding-right: 16px;
+        }
+
+        select.form-control option {
+            color: var(--text-primary);
+            background-color: #fff;
         }
 
         .form-row {
@@ -803,9 +822,21 @@
                 <a href="{{ route('sas.uspk.index') }}" class="sidebar-link {{ request()->routeIs('sas.uspk.*') && !request()->routeIs('sas.uspk-approvals.*') ? 'active' : '' }}">
                     <i class="fas fa-file-signature"></i> Pengajuan USPK
                 </a>
+                <a href="{{ route('sas.uspk-budgets.index') }}" class="sidebar-link menu-uspk-budget {{ request()->routeIs('sas.uspk-budgets.*') ? 'active' : '' }}" data-menu="uspk-budget">
+                    <i class="fas fa-wallet"></i> Budget USPK
+                </a>
                 <a href="{{ route('sas.uspk-approvals.index') }}" class="sidebar-link {{ request()->routeIs('sas.uspk-approvals.*') ? 'active' : '' }}">
                     <i class="fas fa-check-double"></i> Persetujuan Saya
                 </a>
+                @php
+                    $sasRole = strtolower(trim((string) auth()->user()?->moduleRole('sas')));
+                    $isLegalSasRole = $sasRole === 'legal' || auth()->user()?->hasAnyRole(['Legal', 'Super Admin']);
+                @endphp
+                @if($isLegalSasRole)
+                <a href="{{ route('sas.uspk-legal.index') }}" class="sidebar-link {{ request()->routeIs('sas.uspk-legal.*') ? 'active' : '' }}">
+                    <i class="fas fa-balance-scale"></i> Review Legal SPK
+                </a>
+                @endif
             </div>
         </nav>
 
@@ -881,6 +912,7 @@
             <a href="{{ route('modules.index') }}"><i class="fas fa-th-large"></i><span>Modul</span></a>
             <a href="{{ route('sas.dashboard') }}" class="{{ request()->routeIs('sas.dashboard') ? 'active' : '' }}"><i class="fas fa-chart-pie"></i><span>Dashboard</span></a>
             <a href="{{ route('sas.uspk.index') }}" class="{{ request()->routeIs('sas.uspk.*') ? 'active' : '' }}"><i class="fas fa-file-signature"></i><span>USPK</span></a>
+            <a href="{{ route('sas.uspk-budgets.index') }}" class="{{ request()->routeIs('sas.uspk-budgets.*') ? 'active' : '' }}"><i class="fas fa-wallet"></i><span>Budget</span></a>
             <button type="button" onclick="toggleSasSidebar(true)"><i class="fas fa-bars"></i><span>Menu</span></button>
         </div>
     </nav>

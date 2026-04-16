@@ -326,6 +326,9 @@
                                                 if ($isExpired) {
                                                     $executionStatus = $poStatus === 'Partial PO' ? 'Partial Expired' : 'Expired';
                                                     $executionClass = $poStatus === 'Partial PO' ? 'bg-gray-100 text-gray-800 border-gray-200 border' : 'bg-red-50 text-red-700 border-red-200 border';
+                                                } elseif ($pr->isReopened()) {
+                                                    $executionStatus = $poStatus === 'Partial PO' ? 'Reopened (Partial PO)' : 'Reopened';
+                                                    $executionClass = 'bg-purple-100 text-purple-800 border-purple-200 border';
                                                 } else {
                                                     $executionStatus = match($poStatus) {
                                                         'Waiting PO' => 'Waiting PO',

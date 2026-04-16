@@ -18,6 +18,7 @@ return [
                 'Manager',
                 'KTU',
                 'GM',
+                'Legal',
             ],
         ],
         'qc' => [

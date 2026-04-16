@@ -122,9 +122,14 @@
                         <span class="text-sm font-medium">Dashboard</span>
                     </x-prsystem::nav-link>
 
-                    <x-prsystem::nav-link :href="route('pr.index')" :active="request()->routeIs('pr.*')" class="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-white hover:shadow-sm transition-all duration-200">
+                    <x-prsystem::nav-link :href="route('pr.index')" :active="request()->routeIs('pr.*') && request('status') !== 'expired'" class="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-white hover:shadow-sm transition-all duration-200">
                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
                         <span class="text-sm font-medium">Daftar PR</span>
+                    </x-prsystem::nav-link>
+
+                    <x-prsystem::nav-link :href="route('pr.index', ['status' => 'expired'])" :active="request('status') === 'expired'" class="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 hover:shadow-sm transition-all duration-200">
+                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        <span class="text-sm font-medium">PR Expired</span>
                     </x-prsystem::nav-link>
 
                     <x-prsystem::nav-link :href="route('capex.index')" :active="request()->routeIs('capex.*')" class="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-white hover:shadow-sm transition-all duration-200">
@@ -388,9 +393,13 @@
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                             <span>Dashboard</span>
                         </a>
-                        <a href="{{ route('pr.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100">
+                        <a href="{{ route('pr.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 {{ request()->routeIs('pr.*') && request('status') !== 'expired' ? 'bg-gray-100 text-indigo-600' : '' }}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"/></svg>
                             <span>Daftar PR</span>
+                        </a>
+                        <a href="{{ route('pr.index', ['status' => 'expired']) }}" class="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-red-50 text-red-600 {{ request('status') === 'expired' ? 'bg-red-50' : '' }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                            <span>PR Expired</span>
                         </a>
                         <a href="{{ route('capex.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>

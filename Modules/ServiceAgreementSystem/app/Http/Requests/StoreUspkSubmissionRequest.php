@@ -16,14 +16,13 @@ class StoreUspkSubmissionRequest extends FormRequest
         return [
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'location' => 'nullable|string|max:255',
-            'work_type' => 'nullable|string|max:255',
             'department_id' => 'required|exists:departments,id',
             'sub_department_id' => 'required|exists:sub_departments,id',
-            'block_id' => 'required|exists:blocks,id',
+            'block_ids' => 'required|array',
+            'block_ids.*' => 'exists:blocks,id',
             'job_id' => 'required|exists:jobs,id',
             'uspk_budget_activity_id' => 'nullable|exists:uspk_budget_activities,id',
-            'estimated_value' => 'required|numeric|min:0',
+            'estimated_value' => 'nullable|numeric|min:0',
             'estimated_duration' => 'nullable|integer|min:1',
 
             // Tender pembanding (1-3)

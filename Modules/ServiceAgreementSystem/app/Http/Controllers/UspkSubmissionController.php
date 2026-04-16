@@ -30,9 +30,9 @@ class UspkSubmissionController extends Controller
 
     public function create()
     {
-        $departments = Department::orderBy('name')->get();
+        $departments = Department::with('site')->orderBy('name')->get(['id', 'site_id', 'name']);
         $contractors = $this->contractorService->getActive();
-        $jobs = Job::orderBy('name')->get();
+        $jobs = Job::orderBy('name')->get(['id', 'site_id', 'code', 'name']);
 
         return view('serviceagreementsystem::uspk.create', compact('departments', 'contractors', 'jobs'));
     }
@@ -42,9 +42,23 @@ class UspkSubmissionController extends Controller
         $data = $request->except('tenders');
         $tenders = $this->processTenders($request);
 
-        $this->uspkService->store($data, $tenders);
+        $submission = $this->uspkService->store($data, $tenders);
 
-        return redirect()->route('sas.uspk.index')->with('success', 'USPK berhasil dibuat sebagai draft.');
+        $saveDraft = $request->boolean('save_draft');
+
+        if ($saveDraft) {
+            return redirect()->route('sas.uspk.index')->with('success', 'USPK berhasil dibuat sebagai draft.');
+        }
+
+        try {
+            $this->uspkService->submit($submission);
+        } catch (\Throwable $e) {
+            return redirect()->route('sas.uspk.show', $submission)
+                ->with('error', 'USPK tersimpan sebagai draft, tetapi gagal disubmit: ' . $e->getMessage());
+        }
+
+        return redirect()->route('sas.uspk.show', $submission)->with('success', 'USPK berhasil dibuat dan langsung disubmit untuk proses review.');
+
     }
 
     public function show(UspkSubmission $uspk)
@@ -60,9 +74,9 @@ class UspkSubmissionController extends Controller
         }
 
         $uspk->load(['tenders.contractor']);
-        $departments = Department::orderBy('name')->get();
+        $departments = Department::with('site')->orderBy('name')->get(['id', 'site_id', 'name']);
         $contractors = $this->contractorService->getActive();
-        $jobs = Job::orderBy('name')->get();
+        $jobs = Job::orderBy('name')->get(['id', 'site_id', 'code', 'name']);
         $subDepartments = SubDepartment::where('department_id', $uspk->department_id)->get();
         $blocks = Block::where('sub_department_id', $uspk->sub_department_id)->get();
 
@@ -128,15 +142,38 @@ class UspkSubmissionController extends Controller
     }
 
     /**
-     * API: Get budget activities by block
+     * API: Get budget activities by afdeling + job + year
      */
-    public function getBudgetActivities(int $blockId)
+    public function getBudgetActivities(Request $request)
     {
-        $budgets = UspkBudgetActivity::where('block_id', $blockId)
+        $validated = $request->validate([
+            'sub_department_id' => ['required', 'integer', 'exists:sub_departments,id'],
+            'job_id' => ['nullable', 'integer', 'exists:jobs,id'],
+            'year' => ['nullable', 'integer', 'between:2000,2100'],
+        ]);
+
+        $year = (int) ($validated['year'] ?? now()->year);
+
+        $baseQuery = UspkBudgetActivity::query()
+            ->where('sub_department_id', $validated['sub_department_id'])
             ->where('is_active', true)
-            ->where('year', now()->year)
-            ->with('job')
-            ->get();
+            ->where('year', $year)
+            ->with('job');
+
+        $query = clone $baseQuery;
+
+        if (!empty($validated['job_id'])) {
+            $query->where('job_id', $validated['job_id']);
+        }
+
+        $budgets = $query->orderBy('job_id')->get();
+
+        if ($budgets->isEmpty() && !empty($validated['job_id'])) {
+            $budgets = $baseQuery
+                ->orderByRaw('CASE WHEN job_id = ? THEN 0 ELSE 1 END', [$validated['job_id']])
+                ->orderBy('job_id')
+                ->get();
+        }
 
         return response()->json($budgets);
     }

@@ -31,6 +31,7 @@ class UspkSubmissionService
     public function store(array $data, array $tenders): UspkSubmission
     {
         return DB::transaction(function () use ($data, $tenders) {
+            $data = $this->normalizeBlockData($data);
             $data['uspk_number'] = $this->generateUspkNumber($data['department_id'] ?? null);
             $data['status'] = UspkSubmission::STATUS_DRAFT;
             $data['submitted_by'] = auth()->id();
@@ -56,6 +57,7 @@ class UspkSubmissionService
     public function update(UspkSubmission $submission, array $data, array $tenders): UspkSubmission
     {
         return DB::transaction(function () use ($submission, $data, $tenders) {
+            $data = $this->normalizeBlockData($data);
             $this->repository->update($submission, $data);
 
             // Hapus semua tender lama dan buat ulang
@@ -83,34 +85,26 @@ class UspkSubmissionService
         }
 
         return DB::transaction(function () use ($submission) {
+            $schema = $submission->department?->approvalSchemas()
+                ->where('is_active', true)
+                ->with('steps')
+                ->first();
+
+            if (!$schema) {
+                throw new \Exception('Gagal submit: Tidak ada skema approval aktif yang ditetapkan untuk departemen ini.');
+            }
+
+            if ($schema->steps->isEmpty()) {
+                throw new \Exception('Gagal submit: Skema approval tidak memiliki tahapan approval.');
+            }
+
             $submission->update([
                 'status' => UspkSubmission::STATUS_SUBMITTED,
                 'submitted_at' => now(),
             ]);
 
-            // Ambil department_id dari USPK ini
-            $departmentId = $submission->department_id;
-
-            // Cari Schema yang aktif dan terhubung dengan department ini
-            $schema = \Modules\ServiceAgreementSystem\Models\UspkApprovalSchema::where('is_active', true)
-                ->whereHas('departments', function ($q) use ($departmentId) {
-                    $q->where('department_id', $departmentId);
-                })
-                ->first(); // Asumsikan 1 department hanya punya 1 schema aktif
-
-            if (!$schema) {
-                throw new \Exception('Gagal submit: Tidak ada Skema Approval yang ditetapkan untuk Departemen ini.');
-            }
-
-            // Ambil steps/level dari schema tersebut
-            $steps = $schema->steps;
-
-            if ($steps->isEmpty()) {
-                throw new \Exception('Gagal submit: Skema Approval ditemukan tetapi tidak memiliki langkah persetujuan (Steps kosong).');
-            }
-
             // Generate UspkApproval rows berdasarkan steps
-            foreach ($steps as $step) {
+            foreach ($schema->steps as $step) {
                 $submission->approvals()->create([
                     'schema_id' => $schema->id,
                     'level' => $step->level,
@@ -122,7 +116,7 @@ class UspkSubmissionService
             Log::info('USPK Submitted with Pending Schema Approvals generated', [
                 'uspk_id' => $submission->id, 
                 'schema_id' => $schema->id,
-                'step_count' => $steps->count()
+                'step_count' => $schema->steps->count()
             ]);
 
             return $submission->fresh(['approvals']);
@@ -173,5 +167,22 @@ class UspkSubmissionService
         $sequenceFormatted = str_pad($sequence, 3, '0', STR_PAD_LEFT);
 
         return "{$sequenceFormatted}/{$siteCode}-USPK/{$romanMonth}/{$year}";
+    }
+
+    protected function normalizeBlockData(array $data): array
+    {
+        $blockIds = $data['block_ids'] ?? [];
+
+        if (!is_array($blockIds)) {
+            $blockIds = array_filter([(string) $blockIds]);
+        }
+
+        $blockIds = array_values(array_filter($blockIds, fn ($id) => !empty($id)));
+
+        if (!empty($blockIds)) {
+            $data['block_id'] = (int) $blockIds[0];
+        }
+
+        return $data;
     }
 }

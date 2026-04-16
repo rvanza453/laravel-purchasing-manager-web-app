@@ -1,246 +1,740 @@
 <x-serviceagreementsystem::layouts.master :title="'Detail USPK'">
+    @php
+        $sasRole = strtolower(trim((string) auth()->user()?->moduleRole('sas')));
+        $isLegalRole = $sasRole === 'legal' || auth()->user()?->hasAnyRole(['Legal', 'Super Admin']);
+        $isSubmitter = (int) ($uspk->submitted_by ?? 0) === (int) auth()->id();
+        $canDownloadFinalSpk = $uspk->hasFinalSpkDocument() && ($isSubmitter || $isLegalRole);
+        $canProcessLegal = $isLegalRole && $uspk->status === \Modules\ServiceAgreementSystem\Models\UspkSubmission::STATUS_APPROVED && !$uspk->hasFinalSpkDocument();
+    @endphp
+
     @push('actions')
-        @if($uspk->isEditable())
-            <a href="{{ route('sas.uspk.edit', $uspk) }}" class="btn btn-primary btn-sm">
-                <i class="fas fa-edit"></i> Edit
+        <div style="display: flex; gap: 8px;">
+            @if($uspk->isEditable())
+                <a href="{{ route('sas.uspk.edit', $uspk) }}" class="btn btn-outline-primary btn-sm action-btn">
+                    <i class="fas fa-edit"></i> Edit
+                </a>
+                <form action="{{ route('sas.uspk.submit', $uspk) }}" method="POST" style="display: inline;" onsubmit="return confirm('Yakin ingin mensubmit USPK ini?')">
+                    @csrf
+                    <button type="submit" class="btn btn-success btn-sm action-btn shadow-sm">
+                        <i class="fas fa-paper-plane"></i> Submit USPK
+                    </button>
+                </form>
+            @endif
+            @if($canProcessLegal)
+                <a href="{{ route('sas.uspk-legal.export', $uspk) }}" class="btn btn-primary btn-sm action-btn">
+                    <i class="fas fa-file-export"></i> Export Draft SPK
+                </a>
+            @endif
+            @if($canDownloadFinalSpk)
+                <a href="{{ route('sas.uspk-legal.download', $uspk) }}" class="btn btn-success btn-sm action-btn">
+                    <i class="fas fa-file-download"></i> Download SPK Final
+                </a>
+            @endif
+            <a href="{{ route('sas.uspk.index') }}" class="btn btn-secondary btn-sm action-btn">
+                <i class="fas fa-arrow-left"></i> Kembali
             </a>
-            <form action="{{ route('sas.uspk.submit', $uspk) }}" method="POST" style="display: inline;" onsubmit="return confirm('Yakin ingin mensubmit USPK ini?')">
-                @csrf
-                <button type="submit" class="btn btn-success btn-sm">
-                    <i class="fas fa-paper-plane"></i> Submit USPK
-                </button>
-            </form>
-        @endif
-        <a href="{{ route('sas.uspk.index') }}" class="btn btn-secondary btn-sm">
-            <i class="fas fa-arrow-left"></i> Kembali
-        </a>
+        </div>
     @endpush
 
     {{-- Header Info --}}
-    <div class="card mb-4">
-        <div class="card-header">
+    <div class="card mb-4 modern-card">
+        <div class="card-header d-flex justify-content-between align-items-center" style="border-bottom: 1px solid rgba(0,0,0,0.05); padding: 20px 24px;">
             <div>
-                <div class="card-title" style="font-size: 18px;">{{ $uspk->uspk_number }}</div>
-                <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
-                    Dibuat oleh {{ $uspk->submitter->name ?? '-' }} · {{ $uspk->created_at->format('d M Y H:i') }}
+                <div class="card-title text-primary" style="font-size: 20px; font-weight: 800; letter-spacing: -0.5px;">{{ $uspk->uspk_number }}</div>
+                <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px; display: flex; align-items: center; gap: 6px;">
+                    <i class="fas fa-user-circle"></i> {{ $uspk->submitter->name ?? '-' }}
+                    <span style="opacity: 0.5;">•</span>
+                    <i class="far fa-clock"></i> {{ $uspk->created_at->format('d M Y H:i') }}
                 </div>
             </div>
-            <span class="badge badge-{{ $uspk->status }}" style="font-size: 13px; padding: 6px 14px;">
+            <span class="badge badge-{{ $uspk->status }} status-badge">
                 {{ ucfirst(str_replace('_', ' ', $uspk->status)) }}
             </span>
         </div>
-        <div class="card-body">
-            <div style="font-size: 20px; font-weight: 700; margin-bottom: 8px;">{{ $uspk->title }}</div>
+        <div class="card-body" style="padding: 24px;">
+            <div style="font-size: 22px; font-weight: 700; margin-bottom: 10px; color: var(--text-primary);">{{ $uspk->title }}</div>
 
             @if($uspk->description)
-                <p style="color: var(--text-secondary); margin-bottom: 16px;">{{ $uspk->description }}</p>
+                <div class="desc-box">
+                    {{ $uspk->description }}
+                </div>
             @endif
 
-            <div class="form-row" style="margin-top: 20px;">
-                <div>
-                    <div class="text-muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Department</div>
-                    <div style="font-weight: 600;">{{ $uspk->department->name ?? '-' }}</div>
+            <div class="info-grid mt-4">
+                <div class="info-item">
+                    <div class="info-label">Site / Department</div>
+                    <div class="info-value">{{ $uspk->department->name ?? '-' }}</div>
                 </div>
-                <div>
-                    <div class="text-muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Afdeling</div>
-                    <div style="font-weight: 600;">{{ $uspk->subDepartment->name ?? '-' }}</div>
+                <div class="info-item">
+                    <div class="info-label">Afdeling</div>
+                    <div class="info-value">{{ $uspk->subDepartment->name ?? '-' }}</div>
                 </div>
-                <div>
-                    <div class="text-muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Blok</div>
-                    <div style="font-weight: 600;">{{ $uspk->block->name ?? '-' }}</div>
+                <div class="info-item">
+                    <div class="info-label">Blok Area</div>
+                    <div class="info-value">
+                        @if($uspk->block_ids && count($uspk->block_ids) > 0)
+                            @php
+                                $blockNames = \Modules\ServiceAgreementSystem\Models\Block::whereIn('id', $uspk->block_ids)->pluck('name');
+                            @endphp
+                            <div class="tags-container">
+                                @foreach($blockNames as $blockName)
+                                    <span class="tag-badge">{{ $blockName }}</span>
+                                @endforeach
+                            </div>
+                        @elseif($uspk->block)
+                            <span class="tag-badge">{{ $uspk->block->name }}</span>
+                        @else
+                            -
+                        @endif
+                    </div>
                 </div>
-                <div>
-                    <div class="text-muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Aktivitas</div>
-                    <div style="font-weight: 600;">{{ $uspk->job->name ?? '-' }}</div>
-                </div>
-            </div>
-
-            <div class="form-row" style="margin-top: 16px;">
-                <div>
-                    <div class="text-muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Jenis Pekerjaan</div>
-                    <div style="font-weight: 600;">{{ $uspk->work_type ?? '-' }}</div>
-                </div>
-                <div>
-                    <div class="text-muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Lokasi</div>
-                    <div style="font-weight: 600;">{{ $uspk->location ?? '-' }}</div>
-                </div>
-                <div>
-                    <div class="text-muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Estimasi Nilai</div>
-                    <div style="font-weight: 700; color: var(--accent); font-size: 16px;">Rp {{ number_format($uspk->estimated_value, 0, ',', '.') }}</div>
-                </div>
-                <div>
-                    <div class="text-muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Durasi</div>
-                    <div style="font-weight: 600;">{{ $uspk->estimated_duration ? $uspk->estimated_duration . ' hari' : '-' }}</div>
+                <div class="info-item">
+                    <div class="info-label">Aktivitas</div>
+                    <div class="info-value">{{ $uspk->job->name ?? '-' }}</div>
                 </div>
             </div>
         </div>
     </div>
 
     {{-- Tender Pembanding --}}
-    <div class="card mb-4">
-        <div class="card-header">
-            <div class="card-title"><i class="fas fa-balance-scale" style="color: var(--warning); margin-right: 8px;"></i> Perbandingan Tender</div>
+    <div class="card mb-4 modern-card">
+        <div class="card-header" style="padding: 20px 24px; border-bottom: 1px solid rgba(0,0,0,0.05);">
+            <div class="card-title" style="font-size: 16px; font-weight: 700;">
+                <i class="fas fa-balance-scale" style="color: var(--warning); margin-right: 8px;"></i> Perbandingan & Voting Tender
+            </div>
         </div>
-        <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr>
-                        <th>No</th>
-                        <th>Kontraktor</th>
-                        <th>Perusahaan</th>
-                        <th>Nilai Tender</th>
-                        <th>Durasi</th>
-                        <th>Keterangan</th>
-                        <th>Lampiran</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($uspk->tenders as $index => $tender)
-                    <tr style="{{ $tender->is_selected ? 'background: rgba(16, 185, 129, 0.05);' : '' }}">
-                        <td>{{ $index + 1 }}</td>
-                        <td style="font-weight: 600; color: var(--text-primary);">{{ $tender->contractor->name ?? '-' }}</td>
-                        <td>{{ $tender->contractor->company_name ?? '-' }}</td>
-                        <td style="font-weight: 600;">Rp {{ number_format($tender->tender_value, 0, ',', '.') }}</td>
-                        <td>{{ $tender->tender_duration ? $tender->tender_duration . ' hari' : '-' }}</td>
-                        <td>{{ $tender->description ?? '-' }}</td>
-                        <td>
-                            @if($tender->attachment_path)
-                                <a href="{{ asset('storage/' . $tender->attachment_path) }}" target="_blank" class="btn btn-secondary btn-sm">
-                                    <i class="fas fa-download"></i> File
-                                </a>
-                            @else
-                                <span class="text-muted">-</span>
-                            @endif
-                        </td>
-                        <td>
-                            @if($tender->is_selected)
-                                <span class="badge badge-approved"><i class="fas fa-check" style="margin-right: 4px;"></i> Dipilih</span>
-                            @else
-                                <span class="badge badge-draft">Pembanding</span>
-                            @endif
-                        </td>
-                    </tr>
-                    @empty
-                    <tr>
-                        <td colspan="8" class="text-center text-muted">Belum ada tender.</td>
-                    </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-    </div>
+        <div class="card-body" style="padding: 24px; background: rgba(0,0,0,0.01);">
+            @if($uspk->tenders->count() > 0)
+                <div class="tender-scroll-container">
+                    @foreach($uspk->tenders as $index => $tender)
+                        <div class="tender-wrapper">
+                            {{-- Kartu Tender --}}
+                            <label class="tender-card" data-tender-card data-tender-id="{{ $tender->id }}">
+                                <input type="radio" name="selected_tender_id" value="{{ $tender->id }}" class="tender-radio" style="position: absolute; opacity: 0; pointer-events: none;">
+                                
+                                <div class="tender-header">
+                                    <div>
+                                        <div class="tender-subtitle">
+                                            @if($tender->is_selected)
+                                                <i class="fas fa-bookmark"></i> Rekomendasi Pengaju
+                                            @else
+                                                Kandidat
+                                            @endif
+                                        </div>
+                                        <div class="tender-title">{{ $tender->contractor->name ?? '-' }}</div>
+                                        <div class="tender-company">{{ $tender->contractor->company_name ?? '-' }}</div>
+                                    </div>
+                                    <div class="tender-radio-indicator">
+                                        <i class="fas fa-check"></i>
+                                    </div>
+                                </div>
 
-    {{-- Approval Timeline --}}
-    <div class="card">
-        <div class="card-header">
-            <div class="card-title"><i class="fas fa-clipboard-check" style="color: var(--success); margin-right: 8px;"></i> Approval Timeline</div>
-        </div>
-        <div class="card-body">
-            @if($uspk->approvals->count() > 0)
-                <div class="timeline">
-                    @foreach($uspk->approvals as $approval)
-                    <div class="timeline-item">
-                        <div class="timeline-dot {{ $approval->status }}"></div>
-                        <div class="timeline-content">
-                            <div class="timeline-header">
-                                <div>
-                                    <span class="timeline-name">{{ $approval->approver->name ?? 'Unknown' }}</span>
-                                    <span class="badge badge-{{ $approval->status }}" style="margin-left: 8px;">
-                                        {{ ucfirst($approval->status) }}
-                                    </span>
+                                <div class="price-duration-grid">
+                                    <div class="pd-box price-box">
+                                        <div class="pd-label">Harga Penawaran</div>
+                                        <div class="pd-value">Rp {{ number_format($tender->tender_value, 0, ',', '.') }}</div>
+                                    </div>
+                                    <div class="pd-box duration-box">
+                                        <div class="pd-label">Estimasi Durasi</div>
+                                        <div class="pd-value">{{ $tender->tender_duration ? $tender->tender_duration . ' hari' : '-' }}</div>
+                                    </div>
                                 </div>
-                                <span class="timeline-date">
-                                    {{ $approval->approved_at ? $approval->approved_at->format('d M Y H:i') : 'Menunggu' }}
-                                </span>
+
+                                <div class="mb-3">
+                                    <div class="input-label">Catatan Spesifikasi / Nego</div>
+                                    <textarea class="form-control custom-textarea" rows="2" data-tender-description data-original-value="{{ $tender->description }}" readonly>{{ $tender->description }}</textarea>
+                                </div>
+
+                                <div class="edit-grid mb-3">
+                                    <div>
+                                        <label class="input-label">Edit Harga</label>
+                                        <input type="number" class="form-control custom-input" data-tender-value data-original-value="{{ $tender->tender_value }}" value="{{ $tender->tender_value }}" step="0.01" min="0" disabled>
+                                    </div>
+                                    <div>
+                                        <label class="input-label">Edit Durasi</label>
+                                        <input type="number" class="form-control custom-input" data-tender-duration data-original-value="{{ $tender->tender_duration }}" value="{{ $tender->tender_duration }}" min="1" disabled>
+                                    </div>
+                                </div>
+
+                                <div class="tender-footer">
+                                    <div>
+                                        @if($tender->attachment_path)
+                                            <a href="{{ asset('storage/' . $tender->attachment_path) }}" target="_blank" class="attachment-btn">
+                                                <i class="fas fa-paperclip"></i> File Lampiran
+                                            </a>
+                                        @else
+                                            <span class="text-muted" style="font-size: 11px; font-style: italic;">Tidak ada lampiran</span>
+                                        @endif
+                                    </div>
+                                    <button type="button" class="btn btn-light btn-sm toggle-edit-btn" data-tender-edit-toggle>
+                                        <i class="fas fa-pen"></i> Sesuaikan
+                                    </button>
+                                </div>
+                            </label>
+
+                            {{-- SECTION VOTING APPROVER --}}
+                            @php
+                                $tenderVoters = $uspk->approvals->filter(function($app) use ($tender) {
+                                    return $app->voteTender && $app->voteTender->id == $tender->id;
+                                });
+                            @endphp
+                            
+                            <div class="voter-section">
+                                <div class="voter-line"></div>
+                                <div class="voter-title">VOTING APPROVER</div>
+                                <div class="voters-container">
+                                    @if($tenderVoters->count() > 0)
+                                        @foreach($tenderVoters as $app)
+                                            <div class="voter-tooltip" 
+                                                 data-name="{{ $app->approver->name ?? 'Unknown' }}" 
+                                                 data-level="{{ $app->level }}" 
+                                                 data-comment="{{ $app->comment ?: 'Tanpa catatan' }}">
+                                                <div class="voter-avatar">
+                                                    {{ strtoupper(substr($app->approver->name ?? 'U', 0, 1)) }}
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    @else
+                                        <span style="font-size: 11px; color: #a1a1aa; font-style: italic;">Belum ada vote</span>
+                                    @endif
+                                </div>
                             </div>
-                            <div style="font-size: 12px; color: var(--text-muted);">Level {{ $approval->level }} · {{ $approval->role_name }}</div>
-                            @if($approval->comment)
-                                <div class="timeline-comment">
-                                    <i class="fas fa-quote-left" style="font-size: 10px; opacity: 0.5;"></i>
-                                    {{ $approval->comment }}
-                                </div>
-                            @endif
                         </div>
-                    </div>
                     @endforeach
                 </div>
-
-                {{-- Approval form for current approver --}}
-                @php
-                    $pendingApproval = $uspk->approvals->where('user_id', auth()->id())->where('status', 'pending')->first();
-                @endphp
-
-                @if($pendingApproval)
-                <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border-color);">
-                    <h4 style="font-size: 14px; margin-bottom: 16px;">
-                        <i class="fas fa-gavel" style="color: var(--accent);"></i> Tindakan Anda
-                    </h4>
-
-                    <div class="form-group">
-                        <label class="form-label">Komentar</label>
-                        <textarea id="approvalComment" class="form-control" rows="3" placeholder="Masukkan komentar (wajib untuk reject)"></textarea>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" style="display: flex; align-items: center; justify-content: space-between;">
-                            <span>Pilih Kontraktor Pemenang (Opsional)</span>
-                            <span class="badge badge-draft" style="font-size: 10px; font-weight: normal;">Hanya untuk Approver Tertentu</span>
-                        </label>
-                        <select id="winningContractor" class="form-control">
-                            <option value="">-- Biarkan Default / Ikuti Pilihan Sebelumnya --</option>
-                            @foreach($uspk->tenders as $tender)
-                                <option value="{{ $tender->id }}" {{ $tender->is_selected ? 'selected' : '' }}>
-                                    {{ $tender->contractor->name ?? 'Unknown' }} - Rp {{ number_format($tender->tender_value, 0, ',', '.') }}
-                                </option>
-                            @endforeach
-                        </select>
-                        <div class="text-muted mt-1" style="font-size: 11px;">
-                            Jika tidak dipilih, sistem akan menggunakan kontraktor yang sudah ditandai "Dipilih" saat pengajuan awal.
-                        </div>
-                    </div>
-
-                    <div class="d-flex gap-2">
-                        <form action="{{ route('sas.uspk.approve', $uspk) }}" method="POST" style="display: inline;">
-                            @csrf
-                            <input type="hidden" name="comment" id="approveComment">
-                            <input type="hidden" name="selected_tender_id" id="approveTenderId">
-                            <button type="submit" class="btn btn-success" onclick="
-                                document.getElementById('approveComment').value = document.getElementById('approvalComment').value;
-                                document.getElementById('approveTenderId').value = document.getElementById('winningContractor').value;
-                            ">
-                                <i class="fas fa-check"></i> Approve
-                            </button>
-                        </form>
-                        <form action="{{ route('sas.uspk.reject', $uspk) }}" method="POST" style="display: inline;" onsubmit="return validateReject()">
-                            @csrf
-                            <input type="hidden" name="comment" id="rejectComment">
-                            <button type="submit" class="btn btn-danger" onclick="document.getElementById('rejectComment').value = document.getElementById('approvalComment').value">
-                                <i class="fas fa-times"></i> Reject
-                            </button>
-                        </form>
-                    </div>
-                </div>
-                @endif
             @else
-                <div class="empty-state" style="padding: 30px;">
-                    <i class="fas fa-clock"></i>
-                    <p>Belum ada proses approval. USPK harus disubmit terlebih dahulu.</p>
+                <div class="empty-state">
+                    <i class="fas fa-folder-open empty-icon"></i>
+                    <p>Belum ada data tender yang dilampirkan.</p>
                 </div>
             @endif
         </div>
     </div>
 
+    @if($canProcessLegal || $uspk->hasFinalSpkDocument())
+    <div class="card mb-4 modern-card">
+        <div class="card-header" style="padding: 20px 24px; border-bottom: 1px solid rgba(0,0,0,0.05);">
+            <div class="card-title" style="font-size: 16px; font-weight: 700;">
+                <i class="fas fa-gavel" style="color: var(--accent); margin-right: 8px;"></i> Proses Legal SPK
+            </div>
+        </div>
+        <div class="card-body" style="padding: 24px;">
+            @if($uspk->hasFinalSpkDocument())
+                <div class="alert-card mb-4">
+                    <div class="card-body">
+                        <i class="fas fa-check-circle info-icon" style="color: var(--success);"></i>
+                        <div class="info-text">
+                            Dokumen SPK final sudah diunggah oleh <strong>{{ $uspk->legalUploader->name ?? 'Legal' }}</strong>
+                            @if($uspk->legal_spk_uploaded_at)
+                                pada <strong>{{ $uspk->legal_spk_uploaded_at->format('d M Y H:i') }}</strong>
+                            @endif.
+                            @if($uspk->legal_spk_notes)
+                                <div class="mt-2"><strong>Catatan Legal:</strong> {{ $uspk->legal_spk_notes }}</div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @else
+                <div class="alert-card mb-4">
+                    <div class="card-body">
+                        <i class="fas fa-info-circle info-icon"></i>
+                        <div class="info-text">
+                            USPK ini sudah approved final, namun dokumen SPK belum terbit. Export draft SPK, lakukan review/legal negotiation, lalu upload dokumen final yang sudah disepakati.
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            @if($canProcessLegal)
+            <div class="bottom-split-grid" style="grid-template-columns: 1.2fr 0.8fr; gap: 16px;">
+                <div class="card" style="border: 1px solid var(--border-color); border-radius: 12px;">
+                    <div class="card-body" style="padding: 16px;">
+                        <h4 style="margin: 0 0 12px; font-size: 14px; font-weight: 700;">Upload SPK Final Dari Legal</h4>
+                        <form action="{{ route('sas.uspk-legal.upload', $uspk) }}" method="POST" enctype="multipart/form-data">
+                            @csrf
+                            <div class="form-group mb-3">
+                                <label class="input-label">File SPK Final (PDF/DOC/DOCX)</label>
+                                <input type="file" name="spk_document" class="form-control" accept=".pdf,.doc,.docx" required>
+                            </div>
+                            <div class="form-group mb-3">
+                                <label class="input-label">Catatan Legal (Opsional)</label>
+                                <textarea name="legal_spk_notes" class="form-control custom-textarea" rows="3" placeholder="Catatan kesepakatan final dengan kontraktor..."></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-success action-btn">
+                                <i class="fas fa-upload"></i> Upload SPK Final
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card" style="border: 1px solid #fecaca; border-radius: 12px;">
+                    <div class="card-body" style="padding: 16px;">
+                        <h4 style="margin: 0 0 8px; font-size: 14px; font-weight: 700; color: #b91c1c;">Kembalikan ke Pemilihan</h4>
+                        <p class="text-muted" style="font-size: 12px; margin-bottom: 12px;">Gunakan jika hasil nego/legal belum final dan perlu voting ulang approver final.</p>
+                        <form action="{{ route('sas.uspk-legal.return', $uspk) }}" method="POST" onsubmit="return confirm('Kembalikan proses ke pemilihan kontraktor oleh approver final?')">
+                            @csrf
+                            <div class="form-group mb-3">
+                                <label class="input-label">Alasan Pengembalian</label>
+                                <textarea name="comment" class="form-control custom-textarea" rows="3" placeholder="Tuliskan alasan wajib..." required></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-danger action-btn">
+                                <i class="fas fa-undo"></i> Kembalikan Proses
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            @endif
+        </div>
+    </div>
+    @endif
+
+    @php
+        $currentApproval = $uspk->approvals->first(function ($approval) {
+            return in_array($approval->status, ['pending', 'on_hold'], true);
+        });
+        $currentStepAssignee = null;
+        if ($currentApproval) {
+            $step = optional($currentApproval->schema)->steps?->firstWhere('level', $currentApproval->level);
+            $currentStepAssignee = $step?->user;
+        }
+        $currentApproverId = (int) ($currentStepAssignee->id ?? $currentApproval?->user_id ?? 0);
+        $actionableApproval = $currentApproval && $currentApproverId === (int) auth()->id() ? $currentApproval : null;
+        $maxApprovalLevel = $uspk->approvals->max('level');
+        $isFinalApprovalLevel = $actionableApproval && (int) $actionableApproval->level === (int) $maxApprovalLevel;
+    @endphp
+
+    {{-- Layout Split: Form di Kiri, Timeline di Kanan --}}
+    <div class="bottom-split-grid mb-4">
+        
+        {{-- KOLOM KIRI: Approval Actions --}}
+        <div class="action-column">
+            @if($uspk->approvals->count() > 0)
+                @if($actionableApproval)
+                <div class="card modern-card highlight-card">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="card-title mb-0" style="font-size: 18px; font-weight: 700;">
+                                <i class="fas fa-gavel text-accent me-2"></i> Form Keputusan Anda
+                            </div>
+                            @if($isFinalApprovalLevel)
+                                <span class="badge badge-success px-3 py-2" style="border-radius: 8px;">Level Final</span>
+                            @else
+                                <span class="badge badge-warning px-3 py-2" style="border-radius: 8px;">Level {{ $actionableApproval->level }} Voting</span>
+                            @endif
+                        </div>
+                        
+                        <p class="text-muted" style="font-size: 13px; margin-bottom: 20px;">
+                            Silakan pilih kartu tender di atas yang menjadi rekomendasi Anda. Keputusan akhir mutlak berada pada approver level tertinggi.
+                        </p>
+
+                        <form id="approvalActionForm" action="{{ route('sas.uspk.approve', $uspk) }}" method="POST">
+                            @csrf
+                            <input type="hidden" name="selected_tender_id" id="selectedTenderId" value="">
+                            <input type="hidden" name="vote_tender_value" id="voteTenderValue">
+                            <input type="hidden" name="vote_tender_duration" id="voteTenderDuration">
+                            <input type="hidden" name="vote_tender_description" id="voteTenderDescription">
+                            
+                            <div class="form-group mb-4">
+                                <label class="input-label" style="font-size: 12px;">Alasan & Catatan Keputusan</label>
+                                <textarea name="comment" id="approvalComment" class="form-control custom-textarea" rows="4" placeholder="Sebutkan alasan Anda memilih tender tersebut..."></textarea>
+                            </div>
+
+                            <div class="action-buttons-group">
+                                <button type="submit" class="btn btn-success action-btn" id="approveBtn" formaction="{{ route('sas.uspk.approve', $uspk) }}">
+                                    <i class="fas fa-check-circle"></i> {{ $isFinalApprovalLevel ? 'Approve & Finalize' : 'Approve & Vote' }}
+                                </button>
+                                <button type="submit" class="btn btn-warning text-dark action-btn" id="holdBtn" formaction="{{ route('sas.uspk.hold', $uspk) }}">
+                                    <i class="fas fa-pause-circle"></i> Hold Review
+                                </button>
+                                <button type="submit" class="btn btn-danger action-btn" id="rejectBtn" formaction="{{ route('sas.uspk.reject', $uspk) }}">
+                                    <i class="fas fa-times-circle"></i> Reject
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                @endif
+
+                @if(!$actionableApproval && $currentApproval)
+                <div class="card alert-card">
+                    <div class="card-body">
+                        <i class="fas fa-info-circle info-icon"></i>
+                        <div class="info-text">
+                            Tahap approval saat ini sedang diproses pada <strong>Level {{ $currentApproval->level }}</strong> oleh <strong>{{ $currentStepAssignee->name ?? $currentApproval->approver->name ?? 'Approver terkait' }}</strong>.
+                        </div>
+                    </div>
+                </div>
+                @endif
+            @else
+                <div class="card alert-card">
+                    <div class="card-body" style="justify-content: center; text-align: center; flex-direction: column;">
+                        <i class="fas fa-file-signature info-icon" style="opacity: 0.5; margin-bottom: 8px;"></i>
+                        <div class="info-text text-muted">
+                            Proses approval akan dimulai setelah USPK disubmit.
+                        </div>
+                    </div>
+                </div>
+            @endif
+        </div>
+
+        {{-- KOLOM KANAN: Approval Timeline --}}
+        <div class="history-column">
+            <div class="card modern-card" style="height: 100%;">
+                <div class="card-header" style="padding: 20px 24px; border-bottom: 1px solid rgba(0,0,0,0.05);">
+                    <div class="card-title" style="font-size: 16px; font-weight: 700;">
+                        <i class="fas fa-history text-success" style="margin-right: 8px;"></i> Riwayat Jenjang Approval
+                    </div>
+                </div>
+                <div class="card-body p-4">
+                    @if($uspk->approvals->count() > 0)
+                        <div class="modern-timeline">
+                            @foreach($uspk->approvals as $approval)
+                            <div class="timeline-item">
+                                <div class="timeline-marker {{ $approval->status }}"></div>
+                                <div class="timeline-content">
+                                    <div class="timeline-header">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="timeline-name">{{ $approval->approver->name ?? 'Unknown' }}</span>
+                                            <span class="badge badge-{{ $approval->status }} timeline-badge">
+                                                {{ ucfirst($approval->status) }}
+                                            </span>
+                                        </div>
+                                        <span class="timeline-date">
+                                            <i class="far fa-clock"></i> {{ $approval->approved_at ? $approval->approved_at->format('d M Y H:i') : 'Menunggu' }}
+                                        </span>
+                                    </div>
+                                    <div class="timeline-role">Level {{ $approval->level }} · {{ $approval->approver->position ?? 'Approver' }}</div>
+                                    
+                                    @if($approval->voteTender)
+                                        <div class="vote-summary-box mt-2">
+                                            <div class="vote-title"><i class="fas fa-vote-yea text-primary me-1"></i> Memilih: <strong>{{ $approval->voteTender->contractor->name ?? '-' }}</strong></div>
+                                            <div class="vote-details">Nego: Rp {{ number_format((float) ($approval->vote_tender_value ?? $approval->voteTender->tender_value), 0, ',', '.') }} | {{ $approval->vote_tender_duration ?? $approval->voteTender->tender_duration ?? '-' }} Hari</div>
+                                        </div>
+                                    @endif
+
+                                    @if($approval->comment)
+                                        <div class="timeline-comment mt-2">
+                                            <i class="fas fa-quote-left quote-icon"></i>
+                                            {{ $approval->comment }}
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="empty-state" style="padding: 20px;">
+                            <i class="fas fa-project-diagram empty-icon" style="font-size: 30px;"></i>
+                            <p style="font-size: 13px;">Belum ada riwayat tercatat.</p>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+
+    </div>
+
     @push('scripts')
+    <style>
+        /* === GLOBAL VARS & OVERRIDES === */
+        :root {
+            --primary: #4f46e5;
+            --primary-light: #e0e7ff;
+            --accent: #6366f1;
+            --bg-body: #f8fafc;
+            --bg-card: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #334155;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        body { background-color: var(--bg-body); color: var(--text-secondary); }
+
+        /* === MODERN CARD === */
+        .modern-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+        .highlight-card { border: 1px solid var(--accent); box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.1); }
+        .desc-box { background: #f1f5f9; padding: 16px; border-radius: 12px; font-size: 14px; line-height: 1.6; color: var(--text-secondary); border-left: 4px solid var(--text-muted); }
+
+        /* === INFO GRID === */
+        .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+        .info-item { background: #f8fafc; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--border-color); }
+        .info-label { font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px; margin-bottom: 6px; }
+        .info-value { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+        
+        .tags-container { display: flex; flex-wrap: wrap; gap: 6px; }
+        .tag-badge { background: var(--primary-light); color: var(--primary); padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+        .status-badge { padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* === SPLIT LAYOUT GRID === */
+        .bottom-split-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+        @media (max-width: 992px) {
+            .bottom-split-grid { grid-template-columns: 1fr; }
+        }
+
+        /* === TENDER COMPARISON === */
+        .tender-scroll-container { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 20px; padding-top: 5px; scroll-snap-type: x proximity; }
+        .tender-scroll-container::-webkit-scrollbar { height: 8px; }
+        .tender-scroll-container::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .tender-scroll-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        
+        .tender-wrapper { display: flex; flex-direction: column; min-width: 340px; max-width: 360px; scroll-snap-align: start; flex: 0 0 auto; }
+        
+        .tender-card {
+            background: var(--bg-card); border: 2px solid var(--border-color); border-radius: 16px; padding: 20px;
+            cursor: pointer; transition: var(--transition); position: relative; display: flex; flex-direction: column;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02); height: 100%;
+        }
+        .tender-card:hover { border-color: #cbd5e1; transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); }
+        .tender-card--selected { border-color: var(--success) !important; background: rgba(16, 185, 129, 0.02); box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1) !important; }
+        .tender-card--selected .tender-radio-indicator { background: var(--success); color: white; border-color: var(--success); }
+        
+        .tender-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; gap: 12px; }
+        .tender-subtitle { font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); margin-bottom: 4px; letter-spacing: 0.5px; }
+        .tender-title { font-size: 18px; font-weight: 800; color: var(--text-primary); line-height: 1.2; }
+        .tender-company { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+        
+        .tender-radio-indicator {
+            width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border-color); display: flex;
+            align-items: center; justify-content: center; color: transparent; transition: var(--transition); flex-shrink: 0;
+        }
+        .tender-radio-indicator i { font-size: 12px; }
+
+        .price-duration-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+        .pd-box { padding: 12px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.05); }
+        .price-box { background: rgba(37,99,235,0.04); border-color: rgba(37,99,235,0.1); }
+        .duration-box { background: rgba(16,185,129,0.04); border-color: rgba(16,185,129,0.1); }
+        .pd-label { font-size: 10px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); margin-bottom: 4px; }
+        .pd-value { font-size: 14px; font-weight: 800; color: var(--text-primary); }
+
+        .input-label { font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: 0.3px; }
+        .custom-textarea, .custom-input { font-size: 13px; border-radius: 8px; border: 1px solid var(--border-color); padding: 10px 12px; background: #f8fafc; transition: var(--transition); }
+        .custom-textarea:focus, .custom-input:focus { background: white; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); outline: none; }
+        .custom-textarea:disabled, .custom-input:disabled, .custom-textarea[readonly] { background: #f1f5f9; cursor: not-allowed; opacity: 0.8; }
+        
+        .edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .tender-footer { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 16px; border-top: 1px dashed var(--border-color); }
+        .attachment-btn { font-size: 12px; font-weight: 600; color: var(--primary); text-decoration: none; padding: 6px 10px; border-radius: 6px; background: var(--primary-light); transition: var(--transition); }
+        .attachment-btn:hover { background: var(--primary); color: white; text-decoration: none; }
+        
+        .toggle-edit-btn { font-size: 12px; font-weight: 600; border-radius: 6px; }
+
+        /* === VOTER SECTION (THE MAGIC SAUCE) === */
+        .voter-section { position: relative; margin-top: -10px; display: flex; flex-direction: column; align-items: center; z-index: 5; }
+        .voter-line { width: 2px; height: 20px; background: var(--border-color); margin-bottom: 4px; }
+        .voter-title { font-size: 9px; font-weight: 800; color: var(--text-muted); letter-spacing: 1px; background: var(--bg-body); padding: 0 8px; margin-bottom: 8px; z-index: 2; }
+        .voters-container { display: flex; flex-wrap: wrap; justify-content: center; gap: -8px; background: var(--bg-card); padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.03); min-width: 80px; min-height: 40px; align-items: center;}
+        
+        .voter-tooltip { position: relative; cursor: pointer; margin-right: -8px; transition: transform 0.2s; }
+        .voter-tooltip:hover { transform: translateY(-3px); z-index: 10; }
+        .voter-tooltip:last-child { margin-right: 0; }
+        
+        .voter-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--accent)); color: white; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; border: 2px solid var(--bg-card); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        
+        /* Tooltip CSS Magic */
+        .voter-tooltip::before, .voter-tooltip::after { opacity: 0; visibility: hidden; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%) translateY(10px); transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); pointer-events: none; z-index: 100; }
+        .voter-tooltip::before { content: ''; border: 6px solid transparent; border-top-color: #1e293b; margin-bottom: -11px; }
+        .voter-tooltip::after {
+            content: attr(data-name) " (Level " attr(data-level) ")\A\A" attr(data-comment);
+            background: #1e293b; color: #f8fafc; padding: 10px 14px; border-radius: 8px; font-size: 12px;
+            white-space: pre-wrap; width: max-content; max-width: 240px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.2);
+            text-align: left; line-height: 1.4; margin-bottom: 1px; font-family: inherit; font-weight: 500;
+        }
+        .voter-tooltip:hover::before, .voter-tooltip:hover::after { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(-5px); }
+
+        /* === ALERT / INFO CARD === */
+        .alert-card { background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 12px; height: 100%; }
+        .alert-card .card-body { display: flex; align-items: center; gap: 16px; padding: 16px 20px; }
+        .info-icon { font-size: 24px; color: #0284c7; }
+        .info-text { font-size: 14px; color: #0c4a6e; line-height: 1.5; }
+
+        /* === TIMELINE === */
+        .modern-timeline { position: relative; padding-left: 24px; }
+        .modern-timeline::before { content: ''; position: absolute; top: 0; bottom: 0; left: 6px; width: 2px; background: var(--border-color); border-radius: 2px; }
+        .timeline-item { position: relative; margin-bottom: 24px; }
+        .timeline-item:last-child { margin-bottom: 0; }
+        .timeline-marker { position: absolute; left: -24px; top: 4px; width: 14px; height: 14px; border-radius: 50%; background: var(--text-muted); border: 3px solid var(--bg-card); box-shadow: 0 0 0 2px var(--border-color); }
+        .timeline-marker.approved { background: var(--success); box-shadow: 0 0 0 2px rgba(16,185,129,0.2); }
+        .timeline-marker.rejected { background: var(--danger); box-shadow: 0 0 0 2px rgba(239,68,68,0.2); }
+        .timeline-marker.pending { background: var(--warning); box-shadow: 0 0 0 2px rgba(245,158,11,0.2); }
+        
+        .timeline-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+        .timeline-name { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+        .timeline-date { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+        .timeline-badge { font-size: 10px; padding: 4px 8px; border-radius: 6px; }
+        .timeline-role { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+        
+        .vote-summary-box { background: #f8fafc; border: 1px solid var(--border-color); padding: 10px 14px; border-radius: 8px; font-size: 13px; }
+        .vote-title { color: var(--text-secondary); margin-bottom: 2px; }
+        .vote-details { font-weight: 600; color: var(--text-primary); }
+        
+        .timeline-comment { background: rgba(0,0,0,0.03); padding: 12px 16px; border-radius: 0 12px 12px 12px; font-size: 13px; color: var(--text-secondary); position: relative; font-style: italic; border-left: 3px solid var(--accent); }
+        .quote-icon { font-size: 10px; opacity: 0.3; margin-right: 6px; vertical-align: super; }
+
+        /* BUTTONS */
+        .action-btn { padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; transition: var(--transition); }
+        .action-btn:hover { transform: translateY(-1px); }
+        .action-buttons-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
+
+        /* EMPTY STATE */
+        .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+        .empty-icon { font-size: 40px; opacity: 0.3; margin-bottom: 16px; }
+    </style>
+
     <script>
-        function validateReject() {
-            const comment = document.getElementById('approvalComment').value;
-            if (!comment.trim()) {
-                alert('Komentar wajib diisi untuk reject.');
+        function normalizeValue(value) { return (value ?? '').toString().trim(); }
+
+        function cardHasNegotiationChanges(card) {
+            if (!card) return false;
+            const valueInput = card.querySelector('[data-tender-value]');
+            const durationInput = card.querySelector('[data-tender-duration]');
+            const descriptionInput = card.querySelector('[data-tender-description]');
+
+            const valueChanged = normalizeValue(valueInput?.value) !== normalizeValue(valueInput?.dataset.originalValue);
+            const durationChanged = normalizeValue(durationInput?.value) !== normalizeValue(durationInput?.dataset.originalValue);
+            const descriptionChanged = normalizeValue(descriptionInput?.value) !== normalizeValue(descriptionInput?.dataset.originalValue);
+
+            return valueChanged || durationChanged || descriptionChanged;
+        }
+
+        function setCardEditMode(card, editable) {
+            const valueInput = card.querySelector('[data-tender-value]');
+            const durationInput = card.querySelector('[data-tender-duration]');
+            const descriptionInput = card.querySelector('[data-tender-description]');
+            const toggleButton = card.querySelector('[data-tender-edit-toggle]');
+
+            if (valueInput) valueInput.disabled = !editable;
+            if (durationInput) durationInput.disabled = !editable;
+            if (descriptionInput) descriptionInput.readOnly = !editable;
+
+            if (toggleButton) {
+                toggleButton.innerHTML = editable ? '<i class="fas fa-lock"></i> Kunci Edit' : '<i class="fas fa-pen"></i> Sesuaikan';
+                toggleButton.classList.toggle('btn-warning', editable);
+                toggleButton.classList.toggle('btn-light', !editable);
+            }
+        }
+
+        function getSelectedTenderCard() {
+            return document.querySelector('.tender-radio:checked')?.closest('[data-tender-card]') || null;
+        }
+
+        function syncTenderVoteFields() {
+            const selectedCard = getSelectedTenderCard();
+            const tenderValue = document.getElementById('voteTenderValue');
+            const tenderDuration = document.getElementById('voteTenderDuration');
+            const tenderDescription = document.getElementById('voteTenderDescription');
+            const selectedTenderId = document.getElementById('selectedTenderId');
+
+            if (!selectedCard) {
+                if(tenderValue) tenderValue.value = '';
+                if(tenderDuration) tenderDuration.value = '';
+                if(tenderDescription) tenderDescription.value = '';
+                if(selectedTenderId) selectedTenderId.value = '';
+                return;
+            }
+
+            if(tenderValue) tenderValue.value = selectedCard.querySelector('[data-tender-value]')?.value || '';
+            if(tenderDuration) tenderDuration.value = selectedCard.querySelector('[data-tender-duration]')?.value || '';
+            if(tenderDescription) tenderDescription.value = selectedCard.querySelector('[data-tender-description]')?.value || '';
+            if(selectedTenderId) selectedTenderId.value = selectedCard.querySelector('.tender-radio')?.value || '';
+        }
+
+        function validateApprovalAction(event) {
+            const submitter = event.submitter;
+            const decision = submitter ? submitter.id : '';
+            const comment = document.getElementById('approvalComment')?.value.trim();
+            const selectedTenderId = document.getElementById('selectedTenderId')?.value;
+
+            if (decision === 'rejectBtn' && !comment) {
+                event.preventDefault();
+                alert('Komentar wajib diisi jika Anda ingin melakukan Reject.');
                 return false;
             }
-            return confirm('Yakin ingin me-reject USPK ini?');
+
+            if ((decision === 'approveBtn' || decision === 'holdBtn') && !selectedTenderId) {
+                event.preventDefault();
+                alert('Pilih salah satu kartu tender (klik kartunya) sebagai rekomendasi sebelum menyetujui.');
+                return false;
+            }
+
+            if (decision === 'approveBtn' || decision === 'holdBtn') {
+                const selectedCard = getSelectedTenderCard();
+                if (cardHasNegotiationChanges(selectedCard)) {
+                    if (!confirm('Anda melakukan perubahan angka nego/catatan pada tender ini. Perubahan akan disimpan. Lanjutkan?')) {
+                        event.preventDefault(); return false;
+                    }
+                }
+            }
+            return true;
         }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const approvalForm = document.getElementById('approvalActionForm');
+            const tenderCards = document.querySelectorAll('.tender-card');
+            const tenderInputs = document.querySelectorAll('[data-tender-value], [data-tender-duration], [data-tender-description]');
+            const editToggles = document.querySelectorAll('[data-tender-edit-toggle]');
+
+            tenderCards.forEach(card => setCardEditMode(card, false));
+
+            tenderCards.forEach(card => {
+                card.addEventListener('click', function(e) {
+                    if (e.target.closest('[data-tender-edit-toggle]') || e.target.closest('input:not([type="radio"])') || e.target.closest('textarea') || e.target.closest('a')) return;
+
+                    const radio = this.querySelector('.tender-radio');
+                    if (radio) radio.checked = true;
+                    
+                    tenderCards.forEach(c => c.classList.remove('tender-card--selected'));
+                    this.classList.add('tender-card--selected');
+                    syncTenderVoteFields();
+                });
+            });
+
+            tenderInputs.forEach(input => {
+                input.addEventListener('input', syncTenderVoteFields);
+                input.addEventListener('change', syncTenderVoteFields);
+            });
+
+            editToggles.forEach(toggle => {
+                toggle.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const card = this.closest('[data-tender-card]');
+                    if (!card) return;
+                    
+                    const isEditable = this.classList.contains('btn-warning');
+                    setCardEditMode(card, !isEditable);
+                    if (!isEditable) card.querySelector('[data-tender-value]')?.focus();
+                });
+            });
+
+            // Set default selected jika ada
+            const defaultSelected = document.querySelector('.tender-radio:checked');
+            if (!defaultSelected && tenderCards.length > 0) {
+                tenderCards[0].querySelector('.tender-radio').checked = true;
+                tenderCards[0].classList.add('tender-card--selected');
+            } else if (defaultSelected) {
+                defaultSelected.closest('.tender-card').classList.add('tender-card--selected');
+            }
+            syncTenderVoteFields();
+
+            if (approvalForm) approvalForm.addEventListener('submit', validateApprovalAction);
+        });
     </script>
     @endpush
 </x-serviceagreementsystem::layouts.master>

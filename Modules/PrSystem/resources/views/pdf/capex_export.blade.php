@@ -72,6 +72,18 @@
             top: 10px; /* Move up, was 20px, before that 15px */
         }
 
+        /* Page 1 signatures: larger area and image size */
+        .sig-page-1 .sig-container {
+            height: 90px;
+        }
+        .sig-page-1 .sig-img {
+            max-height: 85px;
+            max-width: 170px;
+        }
+        .sig-page-1 .sig-placeholder {
+            padding-top: 34px;
+        }
+
         .header-title {
             text-align: center;
             font-weight: bold;
@@ -123,18 +135,18 @@
         // $getConfig = fn($index) => \Modules\PrSystem\Models\CapexColumnConfig::where('department_id', $capex->department_id)->where('column_index', $index)->first();
 
         // Helper Budget Figures
-        $budgetAwal = ($capex->capexBudget->amount ?? 0) + ($capex->capexBudget->pta_amount ?? 0);
+        $budgetAwal = $capex->is_budgeted ? (($capex->capexBudget->amount ?? 0) + ($capex->capexBudget->pta_amount ?? 0)) : 0;
         $usulan     = $capex->amount;
         
         // Capex yang disetujui sebelumnya: Already computed in controller, just use it
         // $capexSebelumnya is passed from controller to avoid class resolution issues
         
         // Saldo Anggaran yang dapat dipakai (sehingga capex ini bisa diajukan)
-        $saldoDapatDipakai = $capex->code_budget_ditanam ? ($budgetAwal - $capexSebelumnya) : 0;
+        $saldoDapatDipakai = $capex->is_budgeted ? ($budgetAwal - $capexSebelumnya) : 0;
         
         // Over / Under setelah usulan ini
-        $overUnder = $capex->code_budget_ditanam ? ($saldoDapatDipakai - $usulan) : (0 - $usulan);
-        $sisaAkhir = $overUnder;
+        $overUnder = $capex->is_budgeted ? ($saldoDapatDipakai - $usulan) : (0 - $usulan);
+        $sisaAkhir = $capex->is_budgeted ? $overUnder : 0;
 
         $answers = $capex->questionnaire_answers ?? [];
         
@@ -248,7 +260,7 @@
     </div>
 
     <!-- Signatures Page 1 -->
-    <table style="width: 100%; margin-top: 50px; text-align: center;">
+    <table class="sig-page-1" style="width: 100%; margin-top: 50px; text-align: center;">
         <tr>
             <td width="33%">Dibuat oleh :</td>
             <td width="33%">Diperiksa oleh :</td>
@@ -286,7 +298,7 @@
         <tr>
             <td>
                 <b><u>{{ $ttd1->approver->name ?? $capex->user->name }}</u></b><br>
-                KTU Group
+                Estate Manager / Mill Manager
             </td>
             <td>
                 <b><u>{{ $ttd2->approver->name ?? '-' }}</u></b><br>
@@ -298,8 +310,6 @@
             </td>
         </tr>
     </table>
-
-    <div style="text-align: right; margin-top: 50px; font-size: 9pt;">Page 1</div>
     
     <div class="page-break"></div>
 
@@ -357,13 +367,6 @@
                 Penjelasan Project :<br>
                 <b>{{ $capex->description }}</b>
             </td>
-        </tr>
-    </table>
-
-    <!-- Checkboxes -->
-    <table class="no-border" style="width: 100%; margin-bottom: 10px; text-align: center;">
-        <tr>
-            <td>Untuk Scan file kantor Regional Office</td>
         </tr>
     </table>
 
@@ -478,11 +481,11 @@
         <!-- TTD 1 (KA Keu) -->
          <tr>
             <td>KA. Keuangan</td>
-            <td>{{ $ttd1->approver->name ?? '-' }}</td>
+            <td>{{ $ttd2->approver->name ?? '-' }}</td>
             <td class="text-center sig-container">
-                @if($sigImg($ttd1)) <div class="sig-img-wrapper"><img src="{{ $sigImg($ttd1) }}" class="sig-img"></div> @else TTD 1 @endif
+                @if($sigImg($ttd2)) <div class="sig-img-wrapper"><img src="{{ $sigImg($ttd2) }}" class="sig-img"></div> @else TTD 2 @endif
             </td>
-            <td>{{ $ttd1 && $ttd1->signed_at ? $ttd1->signed_at->format('d-M-y') : '' }}</td>
+            <td>{{ $ttd2 && $ttd2->signed_at ? $ttd2->signed_at->format('d-M-y') : '' }}</td>
         </tr>
 
         <!-- Disetujui -->
@@ -524,40 +527,44 @@
     </table>
 
     <!-- Negotiation (Page 2) -->
-    <div style="text-align: center; font-weight: bold; margin-bottom: 5px;">HASIL NEGOSIASI **</div>
-    <table class="bordered" style="width: 100%;">
-        <tr>
-            <th rowspan="2" style="vertical-align: middle; width: 25%;">Nama Supplier</th>
-            <th rowspan="2" style="vertical-align: middle; width: 15%;">Harga (Rp./unit)</th>
-            <th colspan="2" class="text-center" width="30%">Pemenang</th>
-            <th rowspan="2" style="vertical-align: middle; width: 15%;">C E O</th>
-            <th rowspan="2" style="vertical-align: middle; width: 15%;">Tanggal</th>
-        </tr>
-        <tr>
-            <th width="15%">Supplier</th>
-            <th width="15%">Rp./Unit</th>
-        </tr>
-        <tr>
-            <td height="12"></td>
-            <td class="text-center"></td>
-            <td rowspan="4" class="text-center" style="vertical-align: bottom;"></td>
-            <td rowspan="4" class="text-center" style="vertical-align: bottom;"></td>
-            <td rowspan="4" class="text-center" style="vertical-align: bottom;"></td>
-            <td rowspan="4" class="text-center" style="vertical-align: bottom;"></td>
-        </tr>
-        <tr>
-            <td height="12"></td>
-            <td></td>
-        </tr>
-        <tr>
-             <td height="12"></td>
-             <td></td>
-         </tr>
-         <tr>
-             <td height="12"></td>
-             <td></td>
-         </tr>
-    </table>
+    <div style="page-break-inside: avoid; break-inside: avoid; text-align: center; margin-bottom: 5px;">
+    
+        <div style="font-weight: bold; margin-bottom: 5px;">HASIL NEGOSIASI **</div>
+        
+        <table class="bordered" style="width: 100%; border-collapse: collapse;">
+            <tr>
+                <th rowspan="2" style="vertical-align: middle; width: 25%;">Nama Supplier</th>
+                <th rowspan="2" style="vertical-align: middle; width: 15%;">Harga (Rp./unit)</th>
+                <th colspan="2" class="text-center" width="30%">Pemenang</th>
+                <th rowspan="2" style="vertical-align: middle; width: 15%;">C E O</th>
+                <th rowspan="2" style="vertical-align: middle; width: 15%;">Tanggal</th>
+            </tr>
+            <tr>
+                <th width="15%">Supplier</th>
+                <th width="15%">Rp./Unit</th>
+            </tr>
+            <tr>
+                <td height="12"></td>
+                <td class="text-center"></td>
+                <td rowspan="4" class="text-center" style="vertical-align: bottom;"></td>
+                <td rowspan="4" class="text-center" style="vertical-align: bottom;"></td>
+                <td rowspan="4" class="text-center" style="vertical-align: bottom;"></td>
+                <td rowspan="4" class="text-center" style="vertical-align: bottom;"></td>
+            </tr>
+            <tr>
+                <td height="12"></td>
+                <td></td>
+            </tr>
+            <tr>
+                 <td height="12"></td>
+                 <td></td>
+             </tr>
+             <tr>
+                 <td height="12"></td>
+                 <td></td>
+             </tr>
+        </table>
+    </div>
     
     <div style="font-size: 8pt; margin-top: 5px;">
         *) - Harga Exclude PPN,<br>
@@ -567,7 +574,6 @@
     </div>
     
     </div>
-    <div style="text-align: right; margin-top: 50px; font-size: 9pt;">Page 2</div>
     
     <div class="page-break"></div>
 
@@ -666,7 +672,6 @@
 
     </table>
 
-    <div style="text-align: right; margin-top: 50px; font-size: 9pt;">Page 3</div>
     </div>
 
 </body>

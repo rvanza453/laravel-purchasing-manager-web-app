@@ -34,6 +34,24 @@ class ApprovalController extends Controller
         return auth()->user()?->moduleRole('pr') === 'Admin';
     }
 
+    private function canCurrentUserHandleCapexStep(
+        \Modules\PrSystem\Models\CapexApproval $approval,
+        \Modules\PrSystem\Models\CapexColumnConfig $config
+    ): bool {
+        $user = auth()->user();
+
+        if ($this->isPrAdmin()) {
+            return true;
+        }
+
+        if ($config->approver_user_id && (int) $config->approver_user_id === (int) $user->id) {
+            return true;
+        }
+
+        return filled($config->approver_role)
+            && ($user->hasModuleRole('pr', $config->approver_role) || $user->hasRole($config->approver_role));
+    }
+
     public function index()
     {
         // 1. Get PR Approvals
@@ -61,43 +79,36 @@ class ApprovalController extends Controller
             return $allPreviousApproved && in_array($approval->status, ['Pending', 'On Hold']);
         });
 
-        // 2. Get Capex Approvals (Digital Only) - include On Hold
-        $capexQuery = \Modules\PrSystem\Models\CapexApproval::whereIn('status', ['Pending', 'On Hold'])
-            ->with(['capexRequest.user', 'capexRequest.department', 'capexRequest.capexBudget.capexAsset']);
-            
-        if (!$this->isPrAdmin()) {
-            $capexQuery->where('approver_id', auth()->id());
-            // Also need to check Role-based approvals if approver_id is null? 
-            // Actually CapexController sets the approver logic on show. 
-            // For listing, we need to find approvals where I am the target.
-            // Since CapexApproval doesn't always have approver_id pre-filled if it's role based,
-            // we might need to rely on the Config. 
-            // BUT, for simplicity in this iteration, let's assume we filter by ID if set, or we fetch all and filter in PHP.
-        }
-        
-        // Fetching all pending/on-hold capex approvals to filter by logic
+        // 2. Get CAPEX approvals pending for current user/admin
         $allCapexApprovals = \Modules\PrSystem\Models\CapexApproval::whereIn('status', ['Pending', 'On Hold'])
-             ->with(['capexRequest', 'capexRequest.user'])
-             ->get();
-             
+            ->with(['capexRequest.user', 'capexRequest.department', 'capexRequest.capexBudget.capexAsset'])
+            ->orderBy('created_at', 'asc')
+            ->get();
+
         $filteredCapex = $allCapexApprovals->filter(function ($approval) {
-            $config = \Modules\PrSystem\Models\CapexColumnConfig::where('column_index', $approval->column_index)->first();
-            
-            // Only show if it is the current step
-            if ($approval->capexRequest->current_step != $approval->column_index) return false;
-            
-            // If Wet Signature, only Admin sees it
+            if (!$approval->capexRequest) {
+                return false;
+            }
+
+            // Only show active step in inbox
+            if ((int) $approval->capexRequest->current_step !== (int) $approval->column_index) {
+                return false;
+            }
+
+            $config = \Modules\PrSystem\Models\CapexColumnConfig::where('department_id', $approval->capexRequest->department_id)
+                ->where('column_index', $approval->column_index)
+                ->first();
+
+            if (!$config) {
+                return $this->isPrAdmin();
+            }
+
+            // Wet signature step remains admin-only.
             if (!$config->is_digital) {
                 return $this->isPrAdmin();
             }
-            
-            // Digital: Check if I am the approver
-            $user = auth()->user();
-            if ($config->approver_user_id === $user->id) return true;
-            if ($config->approver_role && ($user->hasModuleRole('pr', $config->approver_role) || $user->hasRole($config->approver_role))) return true;
-            if ($this->isPrAdmin()) return true;
-            
-            return false;
+
+            return $this->canCurrentUserHandleCapexStep($approval, $config);
         });
 
         return view('prsystem::approval.index', [

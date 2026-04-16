@@ -430,15 +430,22 @@ class PrController extends Controller
         $fileName = 'rekap_pr_' . date('Y-m-d_H-i') . '.csv';
 
         $headers = [
-            "Content-type"        => "text/csv",
-            "Content-Disposition" => "attachment; filename=$fileName",
-            "Pragma"              => "no-cache",
-            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
-            "Expires"             => "0"
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$fileName}\"",
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+            'X-Accel-Buffering' => 'no',
         ];
 
         $callback = function() use ($viewMode, $request, $user) {
+            @set_time_limit(0);
+            @ini_set('output_buffering', 'off');
+            @ini_set('zlib.output_compression', '0');
+
             $file = fopen('php://output', 'w');
+            // BOM UTF-8 agar CSV aman dibuka di Excel hosting/Windows
+            fwrite($file, "\xEF\xBB\xBF");
             
             // Re-apply Visibility Logic
             $globalApproverSiteIds = $user->prGlobalApproverScopeSiteIds();
@@ -640,14 +647,14 @@ class PrController extends Controller
                         'department_id',
                         'sub_department_id',
                         'status',
-                        'final_total',
+                        'total_estimated_cost',
                         'description',
                     ])
                     ->with([
                         'department:id,name',
                         'subDepartment:id,name',
                         'user:id,name',
-                        'items:id,purchase_request_id,job_id',
+                        'items:id,purchase_request_id,job_id,quantity,price_estimation',
                         'items.job:id,code,name',
                         'approvals' => function ($q) {
                             $q->select('id', 'purchase_request_id', 'approver_id', 'status', 'level', 'role_name')
@@ -669,6 +676,29 @@ class PrController extends Controller
                 if ($request->filled('status')) {
                     if ($request->status === \Modules\PrSystem\Enums\PrStatus::PENDING->value) {
                         $query->whereIn('status', [\Modules\PrSystem\Enums\PrStatus::PENDING->value, \Modules\PrSystem\Enums\PrStatus::ON_HOLD->value]);
+                    } elseif ($request->status === 'Waiting PO') {
+                        $query->whereIn('status', ['Approved', 'PO Created'])
+                              ->whereHas('items', function ($iq) {
+                                  $iq->whereDoesntHave('poItems');
+                              });
+                    } elseif ($request->status === 'Complete PO') {
+                        $query->whereIn('status', ['Approved', 'PO Created'])
+                              ->whereHas('items')
+                              ->whereDoesntHave('items', function ($iq) {
+                                  $iq->whereDoesntHave('poItems');
+                              });
+                    } elseif ($request->status === 'expired') {
+                        $query->whereIn('status', ['Approved', 'PO Created'])
+                              ->whereHas('items', function ($iq) {
+                                  $iq->whereDoesntHave('poItems');
+                              })
+                              ->whereExists(function($q) {
+                                  $q->select(DB::raw(1))
+                                    ->from('pr_approvals')
+                                    ->whereColumn('pr_approvals.purchase_request_id', 'purchase_requests.id')
+                                    ->where('pr_approvals.status', 'Approved')
+                                    ->havingRaw("DATE_ADD(MAX(pr_approvals.approved_at), INTERVAL 14 DAY) < ?", [now()]);
+                              });
                     } else {
                         $query->where('status', $request->status);
                     }
@@ -712,9 +742,21 @@ class PrController extends Controller
                             return $item->job ? ($item->job->code . ' - ' . $item->job->name) : null;
                         })->filter()->unique()->implode(', ');
 
+                        // For approved workflow, export final approved amount (qty may be adjusted by approver).
+                        $finalApprovedAmount = $pr->items->sum(function ($item) {
+                            return ((float) $item->getFinalQuantity()) * ((float) $item->price_estimation);
+                        });
+
+                        $exportAmount = in_array($pr->status, [
+                            \Modules\PrSystem\Enums\PrStatus::APPROVED->value,
+                            'PO Created',
+                        ], true)
+                            ? $finalApprovedAmount
+                            : ((float) ($pr->total_estimated_cost ?? 0));
+
                         fputcsv($file, [
                             $pr->pr_number,
-                            $pr->request_date->format('d/m/Y'),
+                            optional($pr->request_date)->format('d/m/Y') ?? '-',
                             $pr->user->name ?? '-',
                             $pr->department->name ?? '-',
                             $pr->subDepartment->name ?? '-',
@@ -722,7 +764,7 @@ class PrController extends Controller
                             $pr->status,
                             $approvalPos,
                             $pr->items->count(),
-                            $pr->final_total, 
+                            $exportAmount,
                             $pr->description
                         ]);
                     }
@@ -731,7 +773,25 @@ class PrController extends Controller
             fclose($file);
         };
 
-        return response()->stream($callback, 200, $headers);
+        try {
+            ob_start();
+            $callback();
+            $csvContent = ob_get_clean();
+
+            if ($csvContent === false) {
+                throw new \RuntimeException('Failed to capture CSV output buffer.');
+            }
+
+            return response($csvContent, 200, $headers);
+        } catch (\Throwable $e) {
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+
+            report($e);
+
+            return back()->with('error', 'Export gagal diproses server. Silakan coba lagi atau kurangi filter data.');
+        }
     }
 
     public function create()
@@ -1483,6 +1543,26 @@ class PrController extends Controller
         } catch (\Exception $e) {
              \Illuminate\Support\Facades\Log::error('Full Approve Error: ' . $e->getMessage());
              return back()->with('error', 'Failed to approve PR: ' . $e->getMessage());
+        }
+    }
+
+    public function reopenExpired(Request $request, PurchaseRequest $pr)
+    {
+        if (!auth()->user()->hasRole('Admin')) {
+            abort(403, 'Unauthorized action.');
+        }
+        try {
+            $pr->update([
+                'reopened_at' => now(),
+                'reopened_by' => auth()->id(),
+            ]);
+            
+            \Modules\PrSystem\Helpers\ActivityLogger::log('reopened', 'Admin membuka kembali PR yang expired: ' . $pr->pr_number, $pr);
+            
+            return redirect()->back()->with('success', 'PR berhasil dibuka kembali dan dapat dilanjutkan ke proses PO.');
+        } catch (\Exception $e) {
+             \Illuminate\Support\Facades\Log::error('Reopen Expired Error: ' . $e->getMessage());
+             return back()->with('error', 'Gagal membuka kembali PR: ' . $e->getMessage());
         }
     }
 }

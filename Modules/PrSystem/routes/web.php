@@ -81,6 +81,9 @@ Route::middleware(['auth', 'assigned.role', 'pr.role'])->group(function () {
         // Full Approve PR
         Route::post('/pr/{pr}/full-approve', [\Modules\PrSystem\Http\Controllers\PrController::class, 'fullApprove'])->name('pr.full-approve');
 
+        // Reopen Expired PR
+        Route::post('/pr/{pr}/reopen-expired', [\Modules\PrSystem\Http\Controllers\PrController::class, 'reopenExpired'])->name('pr.reopen-expired');
+
         // Inventory master/import actions (Admin only)
         Route::get('/inventory/create', [\Modules\PrSystem\Http\Controllers\InventoryController::class, 'create'])->name('inventory.create');
         Route::post('/inventory', [\Modules\PrSystem\Http\Controllers\InventoryController::class, 'store'])->name('inventory.store');

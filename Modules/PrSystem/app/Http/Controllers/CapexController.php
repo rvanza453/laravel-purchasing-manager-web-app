@@ -18,12 +18,49 @@ class CapexController extends Controller
         return $this->userHasPrRole('Admin');
     }
 
+    private function canCurrentUserApproveCapexStep(?\Modules\PrSystem\Models\CapexColumnConfig $config): bool
+    {
+        if (!$config) {
+            return false;
+        }
+
+        if ($this->isPrAdmin()) {
+            return true;
+        }
+
+        $user = auth()->user();
+
+        if ($config->approver_user_id && (int) $config->approver_user_id === (int) $user->id) {
+            return true;
+        }
+
+        return filled($config->approver_role)
+            && ($user->hasModuleRole('pr', $config->approver_role) || $user->hasRole($config->approver_role));
+    }
+
     public function index()
     {
         $query = \Modules\PrSystem\Models\CapexRequest::with(['user', 'department', 'capexBudget', 'approvals']);
         
-        // Filter: Admin sees all, User sees own
-        if (!$this->userHasPrRole(['Admin', 'Approver'])) {
+        $user = auth()->user();
+
+        // Visibility:
+        // - Admin/Approver sees all CAPEX
+        // - Purchasing sees all CAPEX in their site
+        // - Others see only their own
+        if ($this->userHasPrRole('Admin') || $this->userHasPrRole('Approver')) {
+            // no filter
+        } elseif ($this->userHasPrRole('Purchasing')) {
+            $siteId = $user?->site_id;
+
+            if ($siteId) {
+                $query->whereHas('department', function ($deptQuery) use ($siteId) {
+                    $deptQuery->where('site_id', $siteId);
+                });
+            } else {
+                $query->where('user_id', auth()->id());
+            }
+        } else {
             $query->where('user_id', auth()->id());
         }
         
@@ -202,15 +239,8 @@ class CapexController extends Controller
                     $config = \Modules\PrSystem\Models\CapexColumnConfig::where('department_id', $capex->department_id)
                                 ->where('column_index', $currentStep)
                                 ->first();
-                    
-                    if ($config) {
-                        if ($config->approver_user_id) {
-                            // Specific User Assigned -> Strict Check
-                            if ($config->approver_user_id == $user->id) {
-                                $canApprove = true;
-                            }
-                        }
-                    }
+
+                    $canApprove = $this->canCurrentUserApproveCapexStep($config);
                 }
             }
         }
@@ -286,15 +316,7 @@ class CapexController extends Controller
                         ->where('column_index', $capex->current_step)
                         ->first();
             
-            $isAuthorized = false;
-            if ($config) {
-                if ($config->approver_user_id) {
-                    // Specific User Assigned -> Strict Check
-                    if ($config->approver_user_id == auth()->id()) {
-                        $isAuthorized = true;
-                    }
-                }
-            }
+            $isAuthorized = $this->canCurrentUserApproveCapexStep($config);
             
             if (!$isAuthorized) {
                 return back()->with('error', 'You are not authorized to approve this step.');
@@ -338,7 +360,7 @@ class CapexController extends Controller
                 ->where('column_index', $capex->current_step)
                 ->first();
 
-            if (!$config || (int) $config->approver_user_id !== (int) auth()->id()) {
+            if (!$this->canCurrentUserApproveCapexStep($config)) {
                 return back()->with('error', 'You are not authorized to reject this step.');
             }
         }
@@ -380,7 +402,7 @@ class CapexController extends Controller
                 ->where('column_index', $capex->current_step)
                 ->first();
 
-            if (!$config || (int) $config->approver_user_id !== (int) auth()->id()) {
+            if (!$this->canCurrentUserApproveCapexStep($config)) {
                 return back()->with('error', 'You are not authorized to hold this step.');
             }
         }

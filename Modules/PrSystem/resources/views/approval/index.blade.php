@@ -82,7 +82,6 @@
             <div class="border-t pt-6">
                 <div class="flex items-center gap-2 mb-4">
                     <h3 class="text-lg font-bold text-gray-600">Capex Requests</h3>
-                    <span class="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-bold">Important</span>
                 </div>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

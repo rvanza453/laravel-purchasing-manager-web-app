@@ -5,6 +5,7 @@
         $canSeePo = in_array($prRole, ['Purchasing', 'Finance', 'Admin'], true);
         $canSeeApproval = in_array($prRole, ['Approver', 'Admin'], true);
         $canSeeInventory = in_array($prRole, ['Purchasing', 'Admin'], true);
+        $canSeeCapex = in_array($prRole, ['Purchasing', 'Finance', 'Admin'], true);
         $isPrAdmin = $prRole === 'Admin';
         $canSeeBudgetMonitoring = in_array($prRole, ['Approver', 'Admin', 'Finance'], true);
     @endphp
@@ -226,18 +227,8 @@
             </x-prsystem::responsive-nav-link>
             @endif
 
-            {{-- Admin Only --}}
-            @if($isPrAdmin)
-            <div class="pt-2 border-t border-gray-200 mt-2 px-4 text-xs font-semibold text-gray-500 uppercase">
-                Master Data
-            </div>
-
-
-            
-            <x-prsystem::responsive-nav-link :href="route('master-departments.index')" :active="request()->routeIs('master-departments.*')">
-                {{ __('Departments') }}
-            </x-prsystem::responsive-nav-link>
-            
+            {{-- Purchasing, Finance, Admin --}}
+            @if($canSeeCapex)
             <div class="pt-2 border-t border-gray-200 mt-2 px-4 text-xs font-semibold text-gray-500 uppercase">
                 Capex
             </div>
@@ -247,6 +238,17 @@
                 <x-prsystem::responsive-nav-link :href="route('admin.capex.budgets.index')">Capex Budgets</x-prsystem::responsive-nav-link>
                 <x-prsystem::responsive-nav-link :href="route('admin.capex.config.index')">Sign Config</x-prsystem::responsive-nav-link>
             @endif
+            @endif
+
+            {{-- Admin Only --}}
+            @if($isPrAdmin)
+            <div class="pt-2 border-t border-gray-200 mt-2 px-4 text-xs font-semibold text-gray-500 uppercase">
+                Master Data
+            </div>
+
+            <x-prsystem::responsive-nav-link :href="route('master-departments.index')" :active="request()->routeIs('master-departments.*')">
+                {{ __('Departments') }}
+            </x-prsystem::responsive-nav-link>
 
             <x-prsystem::responsive-nav-link :href="route('users.index')" :active="request()->routeIs('users.*')">
                 {{ __('Users') }}

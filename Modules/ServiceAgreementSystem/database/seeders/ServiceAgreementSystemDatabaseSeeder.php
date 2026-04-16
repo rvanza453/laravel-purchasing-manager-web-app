@@ -86,33 +86,36 @@ class ServiceAgreementSystemDatabaseSeeder extends Seeder
         $jobModels = [];
         foreach ($jobs as $jobData) {
             $jobModels[] = Job::firstOrCreate(
-                ['code' => $jobData['code']],
-                $jobData
+                ['site_id' => $jobData['site_id'], 'code' => $jobData['code']],
+                [
+                    'name' => $jobData['name'],
+                    'department_id' => null,
+                ]
             );
         }
 
-        // Budget Activities (per Block per Job)
-        $blockA1 = Block::where('code', 'A1')->first();
-        $blockA2 = Block::where('code', 'A2')->first();
-
-        if ($blockA1 && isset($jobModels[0])) {
-            UspkBudgetActivity::firstOrCreate(
-                ['block_id' => $blockA1->id, 'job_id' => $jobModels[0]->id, 'year' => 2026],
-                ['budget_amount' => 50000000, 'used_amount' => 0, 'description' => 'Budget pemeliharaan jalan Blok A1 2026']
+        // Budget Activities (per Afdeling per Job per Tahun)
+        if (isset($jobModels[0])) {
+            UspkBudgetActivity::updateOrCreate(
+                ['sub_department_id' => $afd1->id, 'job_id' => $jobModels[0]->id, 'year' => 2026],
+                [
+                    'budget_amount' => 95000000,
+                    'used_amount' => 0,
+                    'description' => 'Budget pemeliharaan jalan Afdeling 1 tahun 2026',
+                    'is_active' => true,
+                ]
             );
         }
 
-        if ($blockA1 && isset($jobModels[2])) {
-            UspkBudgetActivity::firstOrCreate(
-                ['block_id' => $blockA1->id, 'job_id' => $jobModels[2]->id, 'year' => 2026],
-                ['budget_amount' => 30000000, 'used_amount' => 0, 'description' => 'Budget pembersihan lahan Blok A1 2026']
-            );
-        }
-
-        if ($blockA2 && isset($jobModels[0])) {
-            UspkBudgetActivity::firstOrCreate(
-                ['block_id' => $blockA2->id, 'job_id' => $jobModels[0]->id, 'year' => 2026],
-                ['budget_amount' => 45000000, 'used_amount' => 0, 'description' => 'Budget pemeliharaan jalan Blok A2 2026']
+        if (isset($jobModels[2])) {
+            UspkBudgetActivity::updateOrCreate(
+                ['sub_department_id' => $afd1->id, 'job_id' => $jobModels[2]->id, 'year' => 2026],
+                [
+                    'budget_amount' => 30000000,
+                    'used_amount' => 0,
+                    'description' => 'Budget pembersihan lahan Afdeling 1 tahun 2026',
+                    'is_active' => true,
+                ]
             );
         }
 

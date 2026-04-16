@@ -19,6 +19,7 @@ class UspkSubmission extends Model
         'department_id',
         'sub_department_id',
         'block_id',
+        'block_ids',
         'job_id',
         'uspk_budget_activity_id',
         'estimated_value',
@@ -26,11 +27,17 @@ class UspkSubmission extends Model
         'status',
         'submitted_by',
         'submitted_at',
+        'legal_spk_document_path',
+        'legal_spk_uploaded_by',
+        'legal_spk_uploaded_at',
+        'legal_spk_notes',
     ];
 
     protected $casts = [
         'estimated_value' => 'decimal:2',
         'submitted_at' => 'datetime',
+        'legal_spk_uploaded_at' => 'datetime',
+        'block_ids' => 'array',
     ];
 
     // Status constants
@@ -70,6 +77,11 @@ class UspkSubmission extends Model
         return $this->belongsTo(User::class, 'submitted_by');
     }
 
+    public function legalUploader(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'legal_spk_uploaded_by');
+    }
+
     public function tenders(): HasMany
     {
         return $this->hasMany(UspkTender::class);
@@ -99,5 +111,10 @@ class UspkSubmission extends Model
     public function isSubmittable(): bool
     {
         return $this->status === self::STATUS_DRAFT && $this->tenders()->count() >= 1;
+    }
+
+    public function hasFinalSpkDocument(): bool
+    {
+        return !empty($this->legal_spk_document_path);
     }
 }

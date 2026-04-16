@@ -19,7 +19,7 @@ class JobController extends Controller
         $perPage = $request->input('per_page', 10);
         
         $sites = Site::all();
-        $query = Job::with('site','department');
+        $query = Job::with('site', 'department');
     
         if ($request->filled('site_id')) {
             $query->where('site_id', $request->site_id);
@@ -33,7 +33,7 @@ class JobController extends Controller
         }
     
         // 2. Gunakan variabel $perPage di dalam paginate
-        $jobs = $query->orderBy('site_id')->orderBy('department_id')->orderBy('name')->paginate($perPage);
+        $jobs = $query->orderBy('site_id')->orderBy('code')->orderBy('name')->paginate($perPage);
     
         // 3. Tambahkan append agar parameter pencarian & per_page tidak hilang saat pindah halaman
         $jobs->appends($request->all());
@@ -58,9 +58,18 @@ class JobController extends Controller
         $validated = $request->validate([
             'site_id' => 'required|exists:sites,id',
             'department_id' => 'nullable|exists:departments,id',
-            'code' => 'required|string',
+            'code' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('jobs', 'code')->where(function ($query) use ($request) {
+                    return $query->where('site_id', $request->site_id);
+                }),
+            ],
             'name' => 'required|string',
         ]);
+
+        $validated['department_id'] = $validated['department_id'] ?? null;
 
         Job::create($validated);
 
@@ -72,7 +81,8 @@ class JobController extends Controller
      */
     public function edit(Job $job)
     {
-        $sites = \Modules\PrSystem\Models\Site::orderBy('name')->get();
+        $sites = Site::orderBy('name')->get();
+
         return view('prsystem::admin.jobs.edit', compact('job', 'sites'));
     }
 
@@ -82,16 +92,23 @@ class JobController extends Controller
     public function update(Request $request, Job $job)
     {
         $validated = $request->validate([
-            'site_id' => 'required|exists:sites,id',
-            'name' => 'required|string|max:255',
-            'code' => 'nullable|string|max:50',
-            'department_id' => 'nullable', // Allow whatever comes in for now
+            'site_id' => ['required', 'exists:sites,id'],
+            'department_id' => ['nullable', 'exists:departments,id'],
+            'code' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('jobs', 'code')
+                    ->where(fn ($query) => $query->where('site_id', $request->site_id))
+                    ->ignore($job->id),
+            ],
+            'name' => ['required', 'string', 'max:255'],
         ]);
-        if (empty($validated['department_id'])) {
-            $validated['department_id'] = null;
-        }
+
+        $validated['department_id'] = $validated['department_id'] ?? null;
+
         $job->update($validated);
-    
+
         return redirect()->route('jobs.index', ['site_id' => $job->site_id])
             ->with('success', 'Job updated successfully.');
     }
@@ -102,6 +119,7 @@ class JobController extends Controller
     public function destroy(Job $job)
     {
         $job->delete();
+
         return redirect()->back()->with('success', 'Job deleted successfully.');
     }
 }

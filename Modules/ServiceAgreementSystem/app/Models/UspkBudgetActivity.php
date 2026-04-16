@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class UspkBudgetActivity extends Model
 {
     protected $fillable = [
+        'sub_department_id',
         'block_id',
         'job_id',
         'budget_amount',
@@ -26,6 +27,11 @@ class UspkBudgetActivity extends Model
     public function block(): BelongsTo
     {
         return $this->belongsTo(Block::class);
+    }
+
+    public function subDepartment(): BelongsTo
+    {
+        return $this->belongsTo(SubDepartment::class);
     }
 
     public function job(): BelongsTo

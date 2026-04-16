@@ -21,18 +21,24 @@ class PurchaseRequest extends Model
         'description',
         'total_estimated_cost',
         'sub_department_id',
-
+        'reopened_at',
+        'reopened_by',
     ];
 
     protected $casts = [
         'request_date' => 'date',
         'total_estimated_cost' => 'decimal:2',
-
+        'reopened_at' => 'datetime',
     ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function reopenedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reopened_by');
     }
 
     public function department(): BelongsTo
@@ -111,6 +117,10 @@ class PurchaseRequest extends Model
         if ($this->po_status === 'Complete PO') {
             return false;
         }
+
+        if ($this->isReopened()) {
+            return false; // Not considered expired if it was reopened
+        }
         
         $approvedAt = $this->approved_at;
         if (!$approvedAt) return false;
@@ -174,6 +184,14 @@ class PurchaseRequest extends Model
         }
 
         return null;
+    }
+
+    /**
+     * Check if PR was expired and reopened
+     */
+    public function isReopened()
+    {
+        return !is_null($this->reopened_at);
     }
 }
 

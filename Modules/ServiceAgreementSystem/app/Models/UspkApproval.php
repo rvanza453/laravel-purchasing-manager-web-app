@@ -10,15 +10,20 @@ class UspkApproval extends Model
 {
     protected $fillable = [
         'uspk_submission_id',
+        'schema_id',
+        'vote_tender_id',
+        'vote_tender_value',
+        'vote_tender_duration',
+        'vote_tender_description',
         'user_id',
         'level',
-        'role_name',
         'status',
         'comment',
         'approved_at',
     ];
 
     protected $casts = [
+        'vote_tender_value' => 'decimal:2',
         'approved_at' => 'datetime',
     ];
 
@@ -30,6 +35,16 @@ class UspkApproval extends Model
     public function submission(): BelongsTo
     {
         return $this->belongsTo(UspkSubmission::class, 'uspk_submission_id');
+    }
+
+    public function voteTender(): BelongsTo
+    {
+        return $this->belongsTo(UspkTender::class, 'vote_tender_id');
+    }
+
+    public function schema(): BelongsTo
+    {
+        return $this->belongsTo(UspkApprovalSchema::class, 'schema_id');
     }
 
     public function approver(): BelongsTo

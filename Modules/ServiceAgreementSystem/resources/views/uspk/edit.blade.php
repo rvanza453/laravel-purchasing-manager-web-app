@@ -16,18 +16,22 @@
             </div>
             <div class="card-body">
                 <div class="form-group">
-                    <label class="form-label required">Judul Pekerjaan</label>
-                    <input type="text" name="title" class="form-control" value="{{ old('title', $uspk->title) }}" required>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">Jenis Pekerjaan</label>
-                        <input type="text" name="work_type" class="form-control" value="{{ old('work_type', $uspk->work_type) }}">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Lokasi Pekerjaan</label>
-                        <input type="text" name="location" class="form-control" value="{{ old('location', $uspk->location) }}">
+                    <label class="form-label required">Nama Kegiatan</label>
+                    <select id="namaKegiatanSelect" class="form-control" onchange="handleNamaKegiatanChange(this)">
+                        <option value="">-- Pilih Kegiatan --</option>
+                        <option value="Pemeliharaan Jalan">Pemeliharaan Jalan</option>
+                        <option value="Pembersihan Parit / Saluran Air">Pembersihan Parit / Saluran Air</option>
+                        <option value="Pemupukan Tanaman">Pemupukan Tanaman</option>
+                        <option value="Penyemprotan Herbisida">Penyemprotan Herbisida</option>
+                        <option value="Panen Buah Sawit">Panen Buah Sawit</option>
+                        <option value="Pengendalian Hama Terpadu">Pengendalian Hama Terpadu</option>
+                        <option value="Pembangunan / Perbaikan Infrastruktur">Pembangunan / Perbaikan Infrastruktur</option>
+                        <option value="Perawatan Alat Berat">Perawatan Alat Berat</option>
+                        <option value="Lainnya">Isi Sendiri / Lainnya...</option>
+                    </select>
+                    <input type="hidden" name="title" id="titleInput" value="{{ old('title', $uspk->title) }}">
+                    <div id="customTitleWrapper" style="margin-top: 10px; display: none;">
+                        <input type="text" id="customTitleInput" class="form-control" placeholder="Tuliskan nama kegiatan..." value="{{ old('title', $uspk->title) }}">
                     </div>
                 </div>
 
@@ -35,31 +39,20 @@
                     <label class="form-label">Deskripsi</label>
                     <textarea name="description" class="form-control" rows="3">{{ old('description', $uspk->description) }}</textarea>
                 </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label required">Estimasi Nilai (Rp)</label>
-                        <input type="number" name="estimated_value" class="form-control" value="{{ old('estimated_value', $uspk->estimated_value) }}" step="0.01" min="0" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Estimasi Durasi (Hari)</label>
-                        <input type="number" name="estimated_duration" class="form-control" value="{{ old('estimated_duration', $uspk->estimated_duration) }}" min="1">
-                    </div>
-                </div>
             </div>
         </div>
 
-        {{-- Lokasi & Budget --}}
+        {{-- Lokasi & Aktivitas --}}
         <div class="card mb-4">
             <div class="card-header">
-                <div class="card-title"><i class="fas fa-map-marker-alt" style="color: var(--success); margin-right: 8px;"></i> Lokasi & Budget</div>
+                <div class="card-title"><i class="fas fa-map-marker-alt" style="color: var(--success); margin-right: 8px;"></i> Lokasi & Aktivitas</div>
             </div>
             <div class="card-body">
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label required">Department</label>
+                        <label class="form-label required">Site / Department</label>
                         <select name="department_id" id="department_id" class="form-control" required>
-                            <option value="">-- Pilih Department --</option>
+                            <option value="">-- Pilih Site --</option>
                             @foreach($departments as $dept)
                                 <option value="{{ $dept->id }}" {{ old('department_id', $uspk->department_id) == $dept->id ? 'selected' : '' }}>
                                     {{ $dept->name }}
@@ -81,18 +74,18 @@
                 </div>
 
                 <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label required">Blok</label>
-                        <select name="block_id" id="block_id" class="form-control" required>
-                            <option value="">-- Pilih Blok --</option>
+                    <div class="form-group" style="flex: 2;">
+                        <label class="form-label required">Blok <span style="font-size: 11px; color: var(--text-muted);">(bisa pilih lebih dari satu)</span></label>
+                        <select name="block_ids[]" id="block_ids" class="form-control" multiple required style="min-height: 110px;">
                             @foreach($blocks as $b)
-                                <option value="{{ $b->id }}" {{ old('block_id', $uspk->block_id) == $b->id ? 'selected' : '' }}>
+                                <option value="{{ $b->id }}" {{ in_array($b->id, old('block_ids', $uspk->block_ids ?? [])) ? 'selected' : '' }}>
                                     {{ $b->name }} {{ $b->code ? '(' . $b->code . ')' : '' }}
                                 </option>
                             @endforeach
                         </select>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;"><i class="fas fa-info-circle"></i> Tekan Ctrl (Windows) atau Cmd (Mac) untuk memilih lebih dari satu blok.</div>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" style="flex: 1;">
                         <label class="form-label required">Aktivitas (Job)</label>
                         <select name="job_id" id="job_id" class="form-control" required>
                             <option value="">-- Pilih Aktivitas --</option>
@@ -176,9 +169,7 @@
                                 <label class="form-label">Lampiran</label>
                                 <input type="file" name="tenders[{{ $index }}][attachment]" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
                                 @if($tender->attachment_path)
-                                    <div style="margin-top: 4px; font-size: 11px; color: var(--text-muted);">
-                                        <i class="fas fa-paperclip"></i> File sudah ada
-                                    </div>
+                                    <div style="margin-top: 4px; font-size: 11px; color: var(--text-muted);"><i class="fas fa-paperclip"></i> File sudah ada</div>
                                 @endif
                             </div>
                         </div>
@@ -206,21 +197,79 @@
         let tenderCount = {{ $uspk->tenders->count() }};
         const maxTenders = 3;
         const contractorsData = @json($contractors);
+        const departmentsData = @json($departments);
+        const jobsData = @json($jobs);
+        const existingBlockIds = @json($uspk->block_ids ?? []);
+        const selectedBudgetId = @json(old('uspk_budget_activity_id', $uspk->uspk_budget_activity_id));
+        const initialDepartmentId = @json(old('department_id', $uspk->department_id));
+        const initialJobId = @json(old('job_id', $uspk->job_id));
+        const departmentSelect = document.getElementById('department_id');
+        const jobSelect = document.getElementById('job_id');
 
-        function addTenderRow() {
-            if (tenderCount >= maxTenders) {
-                alert('Maksimal 3 tender pembanding.');
+        // --- Nama Kegiatan ---
+        function handleNamaKegiatanChange(select) {
+            const val = select.value;
+            const customWrapper = document.getElementById('customTitleWrapper');
+            const titleInput = document.getElementById('titleInput');
+            const customInput = document.getElementById('customTitleInput');
+            if (val === 'Lainnya') {
+                customWrapper.style.display = 'block';
+                titleInput.value = customInput.value;
+                customInput.oninput = () => titleInput.value = customInput.value;
+            } else {
+                customWrapper.style.display = 'none';
+                titleInput.value = val;
+            }
+        }
+
+        const currentTitle = @json($uspk->title ?? '');
+        if (currentTitle) {
+            const select = document.getElementById('namaKegiatanSelect');
+            let matched = false;
+            for (let opt of select.options) {
+                if (opt.value === currentTitle) { opt.selected = true; matched = true; break; }
+            }
+            if (!matched) {
+                select.value = 'Lainnya';
+                document.getElementById('customTitleWrapper').style.display = 'block';
+                document.getElementById('customTitleInput').value = currentTitle;
+            }
+        }
+
+        function getSiteIdByDepartment(departmentId) {
+            const department = departmentsData.find(item => String(item.id) === String(departmentId));
+            return department ? String(department.site_id ?? '') : '';
+        }
+
+        function renderJobOptions(selectedJobId = '') {
+            const siteId = getSiteIdByDepartment(departmentSelect.value);
+            let options = '<option value="">-- Pilih Aktivitas --</option>';
+
+            if (!siteId) {
+                jobSelect.innerHTML = options;
                 return;
             }
-            const index = tenderCount;
-            const container = document.getElementById('tendersContainer');
 
+            jobsData
+                .filter(job => String(job.site_id ?? '') === String(siteId))
+                .forEach(job => {
+                    const selected = String(selectedJobId) === String(job.id) ? 'selected' : '';
+                    const label = `${job.code ? `${job.code} - ` : ''}${job.name}`;
+                    options += `<option value="${job.id}" ${selected}>${label}</option>`;
+                });
+
+            jobSelect.innerHTML = options;
+        }
+
+        // --- Tender ---
+        function addTenderRow() {
+            if (tenderCount >= maxTenders) { alert('Maksimal 3 tender pembanding.'); return; }
+            const index = tenderCount;
             let contractorOptions = '<option value="">-- Pilih Kontraktor --</option>';
             contractorsData.forEach(c => {
                 const company = c.company_name ? ` (${c.company_name})` : '';
                 contractorOptions += `<option value="${c.id}">${c.name}${company}</option>`;
             });
-
             const html = `
                 <div class="tender-row" data-index="${index}" style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; padding: 20px; margin-bottom: 16px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
@@ -244,7 +293,7 @@
                     </div>
                     <div class="form-group mb-0"><label class="form-label">Keterangan</label><textarea name="tenders[${index}][description]" class="form-control" rows="2"></textarea></div>
                 </div>`;
-            container.insertAdjacentHTML('beforeend', html);
+            document.getElementById('tendersContainer').insertAdjacentHTML('beforeend', html);
             tenderCount++;
             updateAddButton();
         }
@@ -261,40 +310,120 @@
         document.getElementById('uspkForm').addEventListener('submit', function() {
             document.querySelectorAll('[id^="tender_selected_"]').forEach(el => el.value = '0');
             const sel = document.querySelector('input[name="selected_tender"]:checked');
-            if (sel) {
-                const f = document.getElementById(`tender_selected_${sel.value}`);
-                if (f) f.value = '1';
-            }
+            if (sel) { const f = document.getElementById(`tender_selected_${sel.value}`); if (f) f.value = '1'; }
         });
 
-        // Cascade dropdowns
+        // --- Cascade Dropdowns ---
         document.getElementById('department_id').addEventListener('change', function() {
-            const id = this.value;
-            const sub = document.getElementById('sub_department_id');
-            const blk = document.getElementById('block_id');
-            sub.innerHTML = '<option value="">-- Memuat... --</option>';
-            blk.innerHTML = '<option value="">-- Pilih Blok --</option>';
-            if (!id) { sub.innerHTML = '<option value="">-- Pilih Afdeling --</option>'; return; }
-            fetch(`/sas/api/sub-departments/${id}`).then(r => r.json()).then(data => {
+            const deptId = this.value;
+            const subDeptSelect = document.getElementById('sub_department_id');
+            const blockSelect = document.getElementById('block_ids');
+            subDeptSelect.innerHTML = '<option value="">-- Memuat... --</option>';
+            blockSelect.innerHTML = '';
+            if (!deptId) { subDeptSelect.innerHTML = '<option value="">-- Pilih Afdeling --</option>'; return; }
+            fetch(`/sas/api/sub-departments/${deptId}`).then(r => r.json()).then(data => {
                 let o = '<option value="">-- Pilih Afdeling --</option>';
-                data.forEach(s => o += `<option value="${s.id}">${s.name}</option>`);
-                sub.innerHTML = o;
+                data.forEach(sd => o += `<option value="${sd.id}">${sd.name}</option>`);
+                subDeptSelect.innerHTML = o;
             });
         });
 
         document.getElementById('sub_department_id').addEventListener('change', function() {
-            const id = this.value;
-            const blk = document.getElementById('block_id');
-            blk.innerHTML = '<option value="">-- Memuat... --</option>';
-            if (!id) { blk.innerHTML = '<option value="">-- Pilih Blok --</option>'; return; }
-            fetch(`/sas/api/blocks/${id}`).then(r => r.json()).then(data => {
-                let o = '<option value="">-- Pilih Blok --</option>';
-                data.forEach(b => { const c = b.code ? ` (${b.code})` : ''; o += `<option value="${b.id}">${b.name}${c}</option>`; });
-                blk.innerHTML = o;
+            const subDeptId = this.value;
+            const blockSelect = document.getElementById('block_ids');
+            blockSelect.innerHTML = '<option disabled>-- Memuat... --</option>';
+            if (!subDeptId) {
+                blockSelect.innerHTML = '';
+                loadBudgetOptions();
+                return;
+            }
+            fetch(`/sas/api/blocks/${subDeptId}`).then(r => r.json()).then(data => {
+                blockSelect.innerHTML = '';
+                if (!Array.isArray(data) || data.length === 0) {
+                    blockSelect.innerHTML = '<option disabled>-- Tidak ada blok aktif --</option>';
+                    return;
+                }
+
+                data.forEach(b => {
+                    const name = (b.name ?? b.block_name ?? b.nama ?? '').toString().trim();
+                    const codeRaw = (b.code ?? b.block_code ?? '').toString().trim();
+                    const code = codeRaw ? ` (${codeRaw})` : '';
+                    const label = name ? `${name}${code}` : (codeRaw ? `Blok${code}` : `Blok #${b.id}`);
+
+                    const opt = document.createElement('option');
+                    opt.value = b.id;
+                    opt.textContent = label;
+                    if (existingBlockIds.includes(b.id)) opt.selected = true;
+                    blockSelect.appendChild(opt);
+                });
+            }).catch(() => {
+                blockSelect.innerHTML = '<option disabled>-- Gagal memuat blok --</option>';
             });
+
+            loadBudgetOptions();
         });
 
+        jobSelect.addEventListener('change', loadBudgetOptions);
+
+        function loadBudgetOptions() {
+            const subDepartmentId = document.getElementById('sub_department_id').value;
+            const jobId = document.getElementById('job_id').value;
+            const budgetSelect = document.getElementById('uspk_budget_activity_id');
+
+            budgetSelect.innerHTML = '<option value="">-- Memuat budget... --</option>';
+
+            if (!subDepartmentId) {
+                budgetSelect.innerHTML = '<option value="">-- Pilih Budget (opsional) --</option>';
+                return;
+            }
+
+            const params = new URLSearchParams({
+                sub_department_id: subDepartmentId,
+                year: new Date().getFullYear().toString(),
+            });
+
+            if (jobId) {
+                params.append('job_id', jobId);
+            }
+
+            fetch(`/sas/api/budget-activities?${params.toString()}`)
+                .then(response => response.json())
+                .then(data => {
+                    budgetSelect.innerHTML = '<option value="">-- Pilih Budget (opsional) --</option>';
+
+                    if (!Array.isArray(data) || data.length === 0) {
+                        return;
+                    }
+
+                    data.forEach(item => {
+                        const remaining = Number(item.budget_amount) - Number(item.used_amount);
+                        const option = document.createElement('option');
+                        option.value = item.id;
+                        option.textContent = `${item.job?.name ?? 'Job'} - Budget: ${formatCurrency(item.budget_amount)} | Sisa: ${formatCurrency(remaining)}`;
+
+                        if (selectedBudgetId && Number(selectedBudgetId) === Number(item.id)) {
+                            option.selected = true;
+                        }
+
+                        budgetSelect.appendChild(option);
+                    });
+                })
+                .catch(() => {
+                    budgetSelect.innerHTML = '<option value="">-- Gagal memuat budget --</option>';
+                });
+        }
+
         updateAddButton();
+
+        if (departmentSelect.value) {
+            renderJobOptions(initialJobId);
+        } else {
+            renderJobOptions('');
+        }
+
+        if (document.getElementById('sub_department_id').value) {
+            loadBudgetOptions();
+        }
     </script>
     @endpush
 </x-serviceagreementsystem::layouts.master>

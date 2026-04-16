@@ -204,7 +204,7 @@ class QcFinding extends Model
                 'label' => 'Perawatan',
                 'code' => 'RWT',
                 'subs' => [
-                    'semprot_piringan_&_pasar_pikul' => ['label' => 'Semprot Piringan', 'code' => 'RWT-01'],
+                    'semprot_piringan_&_pasar_pikul' => ['label' => 'Semprot Piringan & Pasar Pikul', 'code' => 'RWT-01'],
                     'garuk_piringan' => ['label' => 'Garuk Piringan', 'code' => 'RWT-02'],
                     'tebas_gawangan' => ['label' => 'Tebas Gawangan', 'code' => 'RWT-03'],
                     'prunning' => ['label' => 'Prunning ', 'code' => 'RWT-04'],
@@ -212,16 +212,16 @@ class QcFinding extends Model
                     'oles_anak_kayu' => ['label' => 'Oles Anak Kayu', 'code' => 'RWT-06'],
                     'tusuk_pisang' => ['label' => 'Tusuk Pisang', 'code' => 'RWT-07'],
                     'pengendalian_bambu' => ['label' => 'Pengendalian Bambu', 'code' => 'RWT-08'],
+                    'semprot_gawangan' => ['label' => 'Semprot Gawangan', 'code' => 'RWT-09'],
                 ]
             ],
             'pemupukan' => [
                 'label' => 'Pemupukan',
                 'code' => 'PUP',
                 'subs' => [
-                    'tidak_merata' => ['label' => 'Tidak Merata', 'code' => 'PUP-01'],
-                    'kurang_dosis' => ['label' => 'Kurang Dosis', 'code' => 'PUP-02'],
-                    'lebih_dosis' => ['label' => 'Lebih Dosis', 'code' => 'PUP-03'],
-                    'tidak_di_pupuk' => ['label' => 'Tidak dipupuk', 'code' => 'PUP-04'],
+                    'palmo' => ['label' => 'palmo', 'code' => 'PUP-01'],
+                    'dolomit' => ['label' => 'dolomit', 'code' => 'PUP-02'],
+                    'mikro' => ['label' => 'mikro', 'code' => 'PUP-03'],
                 ]
             ],
             'pengangkutan' => [
@@ -243,9 +243,7 @@ class QcFinding extends Model
             'traksi' => [
                 'label' => 'Traksi',
                 'code' => 'TRK',
-                'subs' => [
-                    
-                ]
+                'subs' => []
             ],'grading' => [
                 'label' => 'Grading',
                 'code' => 'GRD',

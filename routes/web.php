@@ -67,3 +67,5 @@ Route::middleware(['auth', 'assigned.role'])->group(function () {
     // Backward-compatible SAS logout alias used by legacy layouts.
     Route::post('/sas/logout', [LoginController::class, 'logout'])->name('sas.logout');
 });
+
+Route::get('/run-one-time-migration', [App\Http\Controllers\OneTimeMigrationController::class, 'runJobNormalization']);
